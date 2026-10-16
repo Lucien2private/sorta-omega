@@ -13,6 +13,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { ZodError } from "zod";
 import { safeFetchText } from "./safe-fetch.js";
+import { registerSchoolWeatherRoutes } from "./school-weather.js";
 import { decodeNotesCursor, encodeNotesCursor } from "./notes-cursor.js";
 import { focusGroundedEvidence, isAssessmentQuestion } from "./grounded-evidence.js";
 import { validateReminderProposal } from "./assistant-reminder.js";
@@ -5897,6 +5898,7 @@ if (config.NODE_ENV === "production") {
 }
 
 const close = async () => { await app.close(); await pool.end(); };
+registerSchoolWeatherRoutes(app);
 process.on("SIGINT", close);
 process.on("SIGTERM", close);
 

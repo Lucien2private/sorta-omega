@@ -1,0 +1,23 @@
+.school-weather { margin: 0 0 24px; padding: 20px; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 12px; }
+.school-weather header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; }
+.school-weather h2 { margin: 0; font-size: 1.1rem; }
+.school-weather header span, .school-weather p, .school-weather small, .school-weather footer { color: #47545c; }
+.weather-date { margin: 6px 0 16px; font-size: .9rem; }
+.weather-periods { display: grid; grid-template-columns: 1fr; gap: 16px; }
+.weather-periods article { min-width: 0; }
+.weather-periods article + article { border-top: 1px solid var(--line); padding-top: 16px; }
+.weather-periods h3 { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 10px; font-size: 1rem; }
+.weather-periods h3 time { font-weight: 400; }
+.weather-main { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.weather-main strong { font-size: 1.5rem; }
+.weather-main svg { flex-shrink: 0; }
+.weather-periods p { margin: 8px 0; font-size: .9rem; line-height: 1.5; }
+.school-weather small, .school-weather footer { font-size: .8rem; line-height: 1.5; }
+.school-weather footer { margin-top: 16px; }
+.school-weather a { display: inline-block; padding: 12px 0; color: var(--ink); text-underline-offset: 3px; }
+.school-weather a:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+.school-weather a:hover { text-decoration-thickness: 2px; }
+@media (min-width: 560px) {
+  .weather-periods { grid-template-columns: 1fr 1fr; gap: 24px; }
+  .weather-periods article + article { border-top: 0; padding-top: 0; border-left: 1px solid var(--line); padding-left: 24px; }
+}

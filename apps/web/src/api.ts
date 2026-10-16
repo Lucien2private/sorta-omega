@@ -1,5 +1,6 @@
 import type { ActivityEvent, AiOperation, AiStatus, AskHandle, AttendanceRecord, AttendanceSummary, AutomationDecision, BlobSummary, Calendar as CalendarRecord, CalendarBrief, CalendarEntity, CalendarEvent, CalendarPolicySet, CalendarView, Capture, Chat, ChatMessage, Collection, Commitment, CommitmentDetail, EditorDocument, EventReminderPlan, ExportManifest, Flashcard, FlashcardDeck, FlashcardReview, FlashcardReviewItem, Goal, Idea, IndexStatus, Job, JobHandle, KnowledgeGap, Label, MeetilyImport, MeetilyImportResult, Memory, ModelProfile, MomentumPreferences, MomentumSummary, NextActionSet, Note, NoteCommitmentCandidate, NoteRevision, Notification, OccurrenceException, PerformanceGrade, PerformanceSummary, PerformanceTarget, PersonalProfile, Preferences, PrepItem, Project, Proposal, ProposalUndoReceipt, ProviderCalendarAction, RelatedResult, Relationship, Reminder, RoutingRule, RulePreviewResult, ScheduleExplanation, SchedulerPreferences, SchoolAssessment, SchoolAssignment, SchoolCourse, SchoolLesson, SchoolSubject, SearchResult, SourceObjectDetail, StudyAttempt, StudyExercise, StudyPlan, StudySession, SystemStatus, Task, TaskExecutionHistory, Today, TodayNextActionPlan, Transcript, UndoReceipt, UploadSession } from "@sorta/contracts";
 import type { ApiTokenSummary, DeviceCachePolicy, DeviceScope, DeviceSummary, Insight, IntegrationConnection, Interest, PersonalDataImportPreview, PersonalDataItem, SyncAck, SyncBatch, SyncOperation, TokenPair } from "@sorta/contracts";
+import { schoolWeatherSchema } from "@sorta/contracts";
 
 export const VAULT_ID = "00000000-0000-4000-8000-000000000001";
 const BASE = import.meta.env.VITE_API_BASE_URL ?? "";
@@ -32,6 +33,7 @@ type WebAuthnOptions<T> = { challenge_id: string; public_key_options: T; expires
 
 const vaultPath = `/api/v1/vaults/${VAULT_ID}`;
 export const api = {
+  schoolWeather: async () => schoolWeatherSchema.parse(await request<unknown>(`${vaultPath}/school/weather`)),
   session: () => request<AuthSession>("/api/v1/auth/session"),
   preferences: () => request<Preferences>("/api/v1/preferences"),
   updatePreferences: (preferences: Preferences, patch: Partial<Omit<Preferences, "revision" | "updatedAt">>) => request<Preferences>("/api/v1/preferences", { method: "PATCH", body: JSON.stringify({ expectedRevision: preferences.revision, patch }) }),

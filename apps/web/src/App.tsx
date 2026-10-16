@@ -21,6 +21,7 @@ import { assignmentNeedsAttention, openSchoolAssignmentsForToday } from "./today
 import { CalendarTimeline } from "./CalendarTimeline";
 import { AssignmentStatus, assignmentStatusClass } from "./AssignmentStatus";
 import { MeetilyWorkspace } from "./MeetilyWorkspace";
+import { SchoolWeather } from "./SchoolWeather";
 import { isoWeekForDate } from "./calendar-week";
 import { calendarRangeLabel } from "./calendar-range-label";
 import { captureBatchTitle, captureFileSelection, MAX_CAPTURE_FILES, uploadCaptureBatch } from "./capture-batch";
@@ -407,6 +408,7 @@ function OmegaApp({ onLogout,onAuthenticationRequired }: { onLogout: () => Promi
       <section className="content">
         {view === "today" && <>
           <div className="page-heading"><div><p className="eyebrow">{dateLabel}</p><h1>Your day.</h1><p>Start with one useful thing. The rest can wait.</p></div><div className="focus-score"><span>{openSchoolAssignments===null?"—":openTasks.length+openSchoolAssignments.length}</span><small>{openSchoolAssignments===null?todayInitialLoadFinished?"school status unavailable":"loading school":"open items"}</small></div></div>
+          <SchoolWeather calendar={todayCalendar}/>
           <div className="today-grid">
             <article className="next-action card">
               <div className="card-label"><Sparkles size={16}/> Next action</div>
