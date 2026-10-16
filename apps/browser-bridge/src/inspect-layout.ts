@@ -32,6 +32,18 @@ try {
     try { const origin = new URL(candidate.url()).origin; return provider === "teams" ? ["https://teams.microsoft.com", "https://teams.cloud.microsoft"].includes(origin) : origin === expectedOrigin; } catch { return false; }
   });
   let authProbed = false;
+  if (provider === "teams" && args.get("probe-assignment-progress") === "true") {
+    const progress = [];
+    for (const candidate of browser.contexts().flatMap(context => context.pages())) {
+      if (!["https://teams.microsoft.com", "https://teams.cloud.microsoft"].includes(new URL(candidate.url()).origin)) continue;
+      for (const frame of candidate.frames()) {
+        if (!frame.url().startsWith("https://assignments.edu.cloud.microsoft/")) continue;
+        progress.push({ screen: new URL(frame.url()).pathname.includes("/assignments/") ? "assignment_detail" : "assignment_list", cards: await frame.locator(".aui-assignmentListCard").count(), selectedSection: await frame.locator('[role="tab"][aria-selected="true"]').allTextContents() });
+      }
+    }
+    console.log(JSON.stringify({ provider, assignmentProgress: progress }));
+    authProbed = true;
+  }
   if (provider === "teams" && args.get("probe-assignment-auth-window") === "true") {
     const authPages = browser.contexts().flatMap(context => context.pages()).filter(candidate => {
       try { return new URL(candidate.url()).origin === "https://login.microsoftonline.com"; } catch { return false; }
