@@ -12,9 +12,15 @@ function dueDate(assignment: SchoolAssignment): string | null {
   }
 }
 
+export function assignmentNeedsAttention(assignment: SchoolAssignment): boolean {
+  if (assignment.submission?.status === "submitted" || assignment.submission?.status === "submitted_late") return false;
+  if (assignment.submission?.status === "missing") return true;
+  return assignment.providerListSection !== "completed";
+}
+
 export function openSchoolAssignmentsForToday(assignments: SchoolAssignment[], today: string): SchoolAssignment[] {
   return assignments
-    .filter(assignment => !assignment.archivedAt && assignment.providerListSection !== "completed")
+    .filter(assignment => !assignment.archivedAt && assignmentNeedsAttention(assignment))
     .sort((left, right) => {
       const leftDate = dueDate(left);
       const rightDate = dueDate(right);

@@ -13,6 +13,11 @@ function assignment(id: string, overrides: Partial<SchoolAssignment> = {}): Scho
 }
 
 describe("Today school assignments", () => {
+  it("keeps missing work visible even when Teams files it under Completed", () => {
+    const missing = assignment("missing", { providerListSection: "completed", submission: { status: "missing", observedAt: null } });
+    const submitted = assignment("submitted", { providerListSection: "past_due", submission: { status: "submitted_late", observedAt: null } });
+    expect(openSchoolAssignmentsForToday([missing, submitted], "2026-10-16").map(item => item.id)).toEqual(["missing"]);
+  });
   it("shows open imports, puts today's deadline first, and leaves unknown due dates visible", () => {
     const unknown = assignment("unknown");
     const later = assignment("later", { due: { kind: "date_only", date: "2026-10-10", timezone: "Europe/Oslo" } });
