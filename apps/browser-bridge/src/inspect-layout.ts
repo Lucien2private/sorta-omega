@@ -523,7 +523,8 @@ try {
       console.log(JSON.stringify({ provider, structure, frames }));
     } finally { await probe.close(); }
   } else if (args.get("probe-assignments") === "true" && provider === "teams") {
-    const probe = await browser.contexts()[0].newPage();
+    const reuseSignedInTab = args.get("probe-assignment-signin") === "true";
+    const probe = reuseSignedInTab ? page : await browser.contexts()[0].newPage();
     try {
       if (args.get("probe-assignments-direct") === "true") {
         await probe.goto("https://assignments.edu.cloud.microsoft/classes/all/list", { waitUntil: "domcontentloaded", timeout: 30_000 });
@@ -538,7 +539,7 @@ try {
         }));
         console.log(JSON.stringify({ provider, directAssignmentShape: { origin: destination.origin, routeShape: destination.pathname, ...directShape } }));
       }
-      await probe.goto(page.url(), { waitUntil: "domcontentloaded" });
+      if (!reuseSignedInTab) await probe.goto(page.url(), { waitUntil: "domcontentloaded" });
       if (!["https://teams.microsoft.com", "https://teams.cloud.microsoft"].includes(new URL(probe.url()).origin)) throw new Error("teams_probe_left_registered_origin");
       await probe.locator("button").filter({ hasText: /Assignments/ }).first().waitFor({ timeout: 20_000 });
       const appNavigation = probe.getByRole("button", { name: /^Assignments \(Ctrl\+Shift\+4\)$/ });
@@ -792,7 +793,7 @@ try {
         } catch { return { origin: "unavailable", counts: null }; }
       }));
       console.log(JSON.stringify({ provider, structure, frames }));
-    } finally { await probe.close(); }
+    } finally { if (!reuseSignedInTab && !probe.isClosed()) await probe.close(); }
   } else if (args.get("teams-chat-layout-probe") === "true" && provider === "teams") {
     const probe = await browser.contexts()[0].newPage();
     try {
