@@ -595,6 +595,23 @@ try {
             text: (element.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 2000),
             buttons: [...element.querySelectorAll("button")].map(button => ({ label: button.getAttribute("aria-label") ?? button.textContent, disabled: button.disabled })),
           }))) }));
+          if (args.get("probe-assignment-signin") === "true") {
+            const permissionDialog = probe.locator('[role="dialog"], [role="alertdialog"], .fui-DialogSurface').filter({ hasText: /We need to ask for additional permissions\./i });
+            if (await permissionDialog.count() !== 1) throw new Error("teams_assignment_permission_dialog_not_unique");
+            const popupPromise = probe.waitForEvent("popup", { timeout: 15_000 }).catch(() => null);
+            await permissionDialog.getByRole("button", { name: "Continue", exact: true }).click();
+            const popup = await popupPromise;
+            if (popup) {
+              await popup.waitForLoadState("domcontentloaded", { timeout: 20_000 }).catch(() => undefined);
+              const destination = new URL(popup.url());
+              if (!["https://login.microsoftonline.com", "https://login.microsoft.com", "https://login.live.com", "https://teams.cloud.microsoft", "https://teams.microsoft.com"].includes(destination.origin)) throw new Error("teams_assignment_signin_origin_unexpected");
+              console.log(JSON.stringify({ provider, assignmentSignIn: { origin: destination.origin, text: (await popup.locator("body").innerText()).slice(0, 6000), buttons: await popup.locator('button, input[type="submit"]').evaluateAll(elements => elements.map(element => ({ label: element.getAttribute("aria-label") ?? element.textContent ?? element.getAttribute("value") }))) } }));
+            } else if (probe.isClosed()) {
+              console.log(JSON.stringify({ provider, assignmentSignIn: { popup: false, probeClosed: true, verified: false } }));
+            } else {
+              console.log(JSON.stringify({ provider, assignmentSignIn: { popup: false, remainingPermissionDialogs: await permissionDialog.count(), cards: await assignmentsFrame.locator(".aui-assignmentListCard").count() } }));
+            }
+          }
         }
         if (args.get("probe-assignment-settle") === "true") {
           const counts = [];

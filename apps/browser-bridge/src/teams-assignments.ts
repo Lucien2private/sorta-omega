@@ -264,7 +264,7 @@ export async function collectTeamsAssignments(signedInPage: Page): Promise<Teams
     if (new Set(records.map(item => `${item.classExternalId}:${item.assignmentExternalId}`)).size !== records.length) throw new Error("teams_assignment_duplicate_identity");
     return { version: "omega_teams_assignments_json_v1", source_timestamp: new Date().toISOString(), source_origin: assignmentOrigin, coverage: { listRoute: parsedList.pathname, visibleCardCount: records.length, capturedDetailCount: records.length, complete: false, limitation: "Upcoming, Past due and Completed list cards were captured. Pagination, attachments, filters, and submission details have not been verified." }, records };
   } catch (caught) {
-    const permissionPrompt = probe.getByRole("dialog").filter({ hasText: /We need to ask for additional permissions\./i });
+    const permissionPrompt = probe.locator('[role="dialog"], [role="alertdialog"], .fui-DialogSurface').filter({ hasText: /We need to ask for additional permissions\./i });
     if (await permissionPrompt.isVisible().catch(() => false)) throw new Error("teams_assignments_permission_required");
     if (caught instanceof Error && /^teams_[a-z0-9_]+$/.test(caught.message)) throw caught;
     throw new Error(`teams_assignment_${stage}_failed`);
