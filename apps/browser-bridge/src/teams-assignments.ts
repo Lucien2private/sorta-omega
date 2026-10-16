@@ -146,7 +146,7 @@ export async function collectTeamsAssignments(signedInPage: Page): Promise<Teams
     const records: TeamsAssignmentSnapshot["records"] = [];
     const sections = [["upcoming", "Upcoming"], ["past_due", "Past due"], ["completed", "Completed"]] as const;
     for (const [listSection, label] of sections) {
-      stage = "section_open";
+      stage = `section_${listSection}_open`;
       frame = assignmentFrame(probe);
       if (new URL(frame.url()).pathname !== "/classes/all/list") {
         await frame.goto(listUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
@@ -164,11 +164,13 @@ export async function collectTeamsAssignments(signedInPage: Page): Promise<Teams
       await waitForAssignmentListSettled(frame, 24);
       const unfiltered = await readAssignmentCards(frame, null);
       const cardsById = new Map<string, AssignmentCard>();
+      stage = `section_${listSection}_class_filter`;
       const classCombo = await assignmentClassCombo(frame);
       await classCombo.click();
       const classCount = await frame.locator('[role="option"]:visible').count();
       if (classCount < 1 || classCount > 30) throw new Error("teams_assignment_class_filter_count_invalid");
       for (let classIndex = 0; classIndex < classCount; classIndex++) {
+        stage = `section_${listSection}_class_${classIndex}`;
         if (classIndex > 0) await classCombo.click();
         const option = frame.locator('[role="option"]:visible').nth(classIndex);
         await option.click();
@@ -186,6 +188,7 @@ export async function collectTeamsAssignments(signedInPage: Page): Promise<Teams
       // Each detail is reopened through its class filter. Teams can omit
       // class-only records from the nominally unfiltered list, and a filter
       // clear does not consistently restore that list in the same session.
+      stage = `section_${listSection}_detail_list`;
       await frame.goto(listUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
       await frame.getByRole("tab", { name: new RegExp(label, "i") }).click();
       await waitForAssignmentListSettled(frame);
