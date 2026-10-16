@@ -156,8 +156,8 @@ export async function collectTeamsAssignments(signedInPage: Page): Promise<Teams
       await tab.waitFor({ timeout: 25_000 });
       if (await tab.count() !== 1) throw new Error("teams_assignment_section_ambiguous");
       const selectedBefore = await tab.getAttribute("aria-selected") === "true";
-      await tab.click();
       if (!selectedBefore) {
+        await tab.click();
         await frame.waitForFunction(tabName => [...document.querySelectorAll<HTMLElement>('[role="tab"][aria-selected="true"]')]
           .some(item => new RegExp(tabName, "i").test((item.getAttribute("aria-label") ?? item.textContent ?? "").trim())), label, { timeout: 25_000 }).catch(() => { throw new Error("teams_assignment_section_transition_unverified"); });
       }
