@@ -44,7 +44,8 @@ export async function applyTeamsAssignmentSnapshot(client: PoolClient, vaultId: 
     }
 
     const externalId = `${record.classExternalId}:${record.assignmentExternalId}`;
-    const contentHash = hash(record);
+    const normalizedDue = teamsAssignmentDue(record.metadataText, snapshot.source_timestamp);
+    const contentHash = hash({ record, due: normalizedDue });
     const link = (await client.query("SELECT assignment_id,content_hash,source_timestamp FROM school_snapshot_links WHERE vault_id=$1 AND source_origin=$2 AND record_kind='assignment' AND external_id=$3 FOR UPDATE", [vaultId, origin, externalId])).rows[0];
     if (link && new Date(link.source_timestamp).getTime() > Date.parse(snapshot.source_timestamp)) { counts.assignments.stale++; continue; }
     if (link?.content_hash === contentHash) {
@@ -69,7 +70,7 @@ export async function applyTeamsAssignmentSnapshot(client: PoolClient, vaultId: 
       `Original: ${record.detailUrl}`,
     ].join("\n");
     const sourceId = (await client.query("INSERT INTO sources(vault_id,kind,original_text,content_hash) VALUES ($1,'provider',$2,$3) RETURNING id", [vaultId, sourceText, createHash("sha256").update(sourceText).digest("hex")])).rows[0].id as string;
-    const due = JSON.stringify(teamsAssignmentDue(record.metadataText, snapshot.source_timestamp));
+    const due = JSON.stringify(normalizedDue);
     if (link) {
       await client.query(`UPDATE school_assignments SET course_id=$3,title=$4,due=$5::jsonb,instructions_source_ids=ARRAY[$6]::uuid[],provider_list_section=$7,provider_detail_state=$8,revision=revision+1,updated_at=now()
         WHERE vault_id=$1 AND id=$2 AND origin='provider' AND archived_at IS NULL`, [vaultId, link.assignment_id, courseId, record.title, due, sourceId, record.listSection ?? null, record.detailState ?? "available"]);
