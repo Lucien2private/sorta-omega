@@ -173,6 +173,23 @@ main { min-width: 0; }
 .calendar-timeline-marker { padding: 5px 7px; border-radius: 5px; background: #ffe8e2; color: #802c18; }.calendar-timeline-marker strong,.calendar-timeline-marker small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .66rem; }.calendar-timeline-marker small { opacity: .8; }
 .calendar-timeline-marker.attendance-absent { background: #fbd5d1; color: #8d2118; }.calendar-timeline-marker.attendance-late { background: #fff0ae; color: #644b00; }
 .calendar-timeline-marker.deadline { background: #fff0d7; color: #743b08; }
+.calendar-projection .assignment-submitted { position: relative; background: #16713d; color: #fff; border-color: #10552d; }
+.calendar-projection .assignment-submitted_late { position: relative; background: #ddf4df; color: #164b25; border-color: #39754a; padding-right: 18px; }
+.calendar-projection .assignment-missing { position: relative; background: #fce4e1; color: #85291e; border-color: #a3382b; }
+.calendar-projection .assignment-submitted small,.calendar-projection .assignment-submitted time { color: #fff; opacity: 1; }
+.calendar-projection .assignment-submitted_late small,.calendar-projection .assignment-submitted_late time { color: #164b25; opacity: 1; }
+.calendar-projection .assignment-missing small,.calendar-projection .assignment-missing time { color: #85291e; opacity: 1; }
+.assignment-late-corner { position: absolute; top: 3px; right: 3px; width: 10px; height: 10px; border: 1px solid #765600; background: #ffdc49; border-radius: 1px; }
+.assignment-submission-label { font-weight: 600; overflow-wrap: anywhere; }
+.assignment-observed { font-weight: 400; }
+.calendar-timeline-marker .assignment-submission-label { white-space: normal; overflow: visible; }
+.calendar-timeline-marker .assignment-observed,.calendar-block .assignment-observed { display: none; }
+.assessment-item.assignment-submitted { position: relative; background: #c8e9d2; border-color: #39754a; }
+.assessment-item.assignment-submitted_late { position: relative; background: #ddf4df; border-color: #39754a; padding-right: 22px; }
+.assessment-item.assignment-missing { position: relative; background: #fce4e1; border-color: #a3382b; }
+.assessment-item .assignment-submission-label { display: block; margin-top: 4px; }
+.assessment-item.assignment-submitted>div>small,.assessment-item.assignment-submitted_late>div>small { color: #164b25; }
+.assessment-item.assignment-missing>div>small { color: #85291e; }
 .calendar-timeline-hours { position: sticky; left: 0; }.calendar-timeline-hours span { position: absolute; right: 7px; transform: translateY(-50%); color: var(--muted); font-size: .62rem; }
 .calendar-timeline-hours span:first-child { transform: none; }.calendar-timeline-hours span:last-child { transform: translateY(-100%); }
 .calendar-timeline-day { position: relative; min-width: 0; border-left: 1px solid var(--line); border-top: 1px solid var(--line); background: repeating-linear-gradient(to bottom, #fff 0, #fff 63px, #e3e9ed 63px, #e3e9ed 64px); }

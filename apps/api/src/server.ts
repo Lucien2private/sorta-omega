@@ -347,6 +347,7 @@ import { reciprocalRankFusion, type RankedCandidate } from "./rank-fusion.js";
 import { expandOccurrences, instantFromWallClock, isSupportedTimezone } from "./recurrence.js";
 import { calendarSourceStaleness, validateCalendarViewRange } from "./calendar-view.js";
 import { attendanceForClass, type ClassAttendanceLink } from "./calendar-attendance.js";
+import { assignmentSubmission } from "./assignment-submission.js";
 import { explicitCapturedTaskTitle } from "./captured-task.js";
 import { groundedReturnCandidates } from "./commitment-candidates.js";
 import { prepStatusTransition } from "./prep-item.js";
@@ -604,7 +605,7 @@ const mapAiOperation = (row: Record<string, any>) => aiOperationSchema.parse({
 });
 const mapSchoolSubject = (row: Record<string, any>) => schoolSubjectSchema.parse({ id: row.id, vaultId: row.vault_id, name: row.name, code: row.code, academicPeriod: row.academic_period, sourceAnchorIds: row.source_anchor_ids, origin: row.origin, archivedAt: row.archived_at ? iso(row.archived_at) : null, revision: row.revision, createdAt: iso(row.created_at), updatedAt: iso(row.updated_at) });
 const mapSchoolCourse = (row: Record<string, any>) => schoolCourseSchema.parse({ id: row.id, vaultId: row.vault_id, subjectId: row.subject_id, name: row.name, academicPeriod: row.academic_period, teacherEntityIds: row.teacher_entity_ids, classEntityIds: row.class_entity_ids, sourceAnchorIds: row.source_anchor_ids, origin: row.origin, archivedAt: row.archived_at ? iso(row.archived_at) : null, revision: row.revision, createdAt: iso(row.created_at), updatedAt: iso(row.updated_at) });
-const mapSchoolAssignment = (row: Record<string, any>) => schoolAssignmentSchema.parse({ id: row.id, vaultId: row.vault_id, courseId: row.course_id, title: row.title, instructionsSourceIds: row.instructions_source_ids, due: row.due, materialSourceIds: row.material_source_ids, taskIds: row.task_ids, preparationStatus: row.preparation_status, origin: row.origin, providerListSection: row.provider_list_section ?? null, providerDetailState: row.provider_detail_state ?? null, providerSeenInLatestSnapshot: row.provider_seen_in_latest_snapshot ?? null, sourceObjectId: row.source_object_id ?? null, archivedAt: row.archived_at ? iso(row.archived_at) : null, revision: row.revision, createdAt: iso(row.created_at), updatedAt: iso(row.updated_at) });
+const mapSchoolAssignment = (row: Record<string, any>) => schoolAssignmentSchema.parse({ id: row.id, vaultId: row.vault_id, courseId: row.course_id, title: row.title, instructionsSourceIds: row.instructions_source_ids, due: row.due, materialSourceIds: row.material_source_ids, taskIds: row.task_ids, preparationStatus: row.preparation_status, origin: row.origin, providerListSection: row.provider_list_section ?? null, providerDetailState: row.provider_detail_state ?? null, providerSeenInLatestSnapshot: row.provider_seen_in_latest_snapshot ?? null, sourceObjectId: row.source_object_id ?? null, archivedAt: row.archived_at ? iso(row.archived_at) : null, revision: row.revision, createdAt: iso(row.created_at), updatedAt: iso(row.updated_at), submission: assignmentSubmission(row.submission_record,row.submission_timestamp?iso(row.submission_timestamp):null,row.due) });
 const mapCourseMaterialLink=(row:Record<string,any>)=>courseMaterialLinkSchema.parse({id:row.id,vaultId:row.vault_id,courseId:row.course_id,sourceId:row.source_object_id,revisionId:row.source_revision_id,chapter:row.chapter,lessonId:row.lesson_id,mappingOrigin:row.mapping_origin,evidenceAnchorIds:row.evidence_anchor_ids,revision:row.revision,createdAt:iso(row.created_at),updatedAt:iso(row.updated_at)});
 const mapSchoolLesson = (row: Record<string, any>) => schoolLessonSchema.parse({ id: row.id, vaultId: row.vault_id, courseId: row.course_id, calendarEventId: row.calendar_event_id, timeSpec: row.time_spec, room: row.room, sourceAnchorIds: row.source_anchor_ids, origin: row.origin, archivedAt: row.archived_at ? iso(row.archived_at) : null, revision: row.revision, createdAt: iso(row.created_at), updatedAt: iso(row.updated_at) });
 const mapSchoolAssessment = (row: Record<string, any>) => schoolAssessmentSchema.parse({ id: row.id, vaultId: row.vault_id, courseId: row.course_id, title: row.title, kind: row.kind, timeSpec: row.time_spec, materialScope: row.material_scope, officialWeight: row.official_weight, sourceAnchorIds: row.source_anchor_ids, origin: row.origin, archivedAt: row.archived_at ? iso(row.archived_at) : null, revision: row.revision, createdAt: iso(row.created_at), updatedAt: iso(row.updated_at) });
@@ -2303,10 +2304,10 @@ app.get("/api/v1/vaults/:vaultId/school/assignments", async (request, reply) => 
   idSchema.parse(vaultId); if (courseId) idSchema.parse(courseId); const limit = rawLimit === undefined ? 100 : Number(rawLimit);
   if (!Number.isInteger(limit) || limit < 1 || limit > 200 || !["active", "archived", "all"].includes(status)) return reply.code(400).send({ error: "invalid_assignment_filter" });
   const result = await query(
-    `SELECT a.*,l.source_object_id,
+    `SELECT a.*,l.source_object_id,seen.source_record AS submission_record,seen.source_timestamp AS submission_timestamp,
       CASE WHEN seen.source_timestamp IS NULL THEN NULL ELSE seen.source_timestamp=latest.source_timestamp END AS provider_seen_in_latest_snapshot
      FROM school_assignments a LEFT JOIN school_microsoft_links l ON l.assignment_id=a.id AND l.vault_id=a.vault_id
-     LEFT JOIN LATERAL (SELECT source_origin,source_timestamp FROM school_snapshot_links WHERE vault_id=a.vault_id AND assignment_id=a.id AND record_kind='assignment' ORDER BY source_timestamp DESC LIMIT 1) seen ON true
+     LEFT JOIN LATERAL (SELECT source_origin,source_timestamp,source_record FROM school_snapshot_links WHERE vault_id=a.vault_id AND assignment_id=a.id AND record_kind='assignment' AND source_origin='https://assignments.edu.cloud.microsoft' ORDER BY source_timestamp DESC LIMIT 1) seen ON true
      LEFT JOIN LATERAL (SELECT max(source_timestamp) AS source_timestamp FROM school_snapshot_links WHERE vault_id=a.vault_id AND source_origin=seen.source_origin AND record_kind='assignment') latest ON true
      WHERE a.vault_id=$1 AND ($2::uuid IS NULL OR a.course_id=$2)
      AND ($3='all' OR ($3='active' AND a.archived_at IS NULL) OR ($3='archived' AND a.archived_at IS NOT NULL))
@@ -2319,10 +2320,10 @@ app.get("/api/v1/vaults/:vaultId/school/assignments", async (request, reply) => 
 
 app.get("/api/v1/vaults/:vaultId/school/assignments/:assignmentId", async (request, reply) => {
   const { vaultId, assignmentId } = request.params as { vaultId: string; assignmentId: string }; idSchema.parse(vaultId); idSchema.parse(assignmentId);
-  const result = await query(`SELECT a.*,l.source_object_id,
+  const result = await query(`SELECT a.*,l.source_object_id,seen.source_record AS submission_record,seen.source_timestamp AS submission_timestamp,
     CASE WHEN seen.source_timestamp IS NULL THEN NULL ELSE seen.source_timestamp=latest.source_timestamp END AS provider_seen_in_latest_snapshot
     FROM school_assignments a LEFT JOIN school_microsoft_links l ON l.assignment_id=a.id AND l.vault_id=a.vault_id
-    LEFT JOIN LATERAL (SELECT source_origin,source_timestamp FROM school_snapshot_links WHERE vault_id=a.vault_id AND assignment_id=a.id AND record_kind='assignment' ORDER BY source_timestamp DESC LIMIT 1) seen ON true
+    LEFT JOIN LATERAL (SELECT source_origin,source_timestamp,source_record FROM school_snapshot_links WHERE vault_id=a.vault_id AND assignment_id=a.id AND record_kind='assignment' AND source_origin='https://assignments.edu.cloud.microsoft' ORDER BY source_timestamp DESC LIMIT 1) seen ON true
     LEFT JOIN LATERAL (SELECT max(source_timestamp) AS source_timestamp FROM school_snapshot_links WHERE vault_id=a.vault_id AND source_origin=seen.source_origin AND record_kind='assignment') latest ON true
     WHERE a.vault_id=$1 AND a.id=$2`, [vaultId, assignmentId]);
   if (!result.rows[0]) return reply.code(404).send({ error: "school_assignment_not_found" }); return mapSchoolAssignment(result.rows[0]);
@@ -3836,7 +3837,9 @@ app.get("/api/v1/vaults/:vaultId/calendar-view",async(request,reply)=>{
     query("SELECT calendar_event_id FROM school_lessons WHERE vault_id=$1 AND archived_at IS NULL AND calendar_event_id IS NOT NULL",[vaultId]),
     query("SELECT calendar_event_id FROM study_sessions WHERE vault_id=$1 AND archived_at IS NULL AND calendar_event_id IS NOT NULL UNION SELECT event_id AS calendar_event_id FROM scheduled_task_event_links l JOIN schedule_proposals p ON p.id=l.proposal_id WHERE p.vault_id=$1",[vaultId]),
     query("SELECT l.id,l.time_spec,l.revision,c.name AS course_name FROM school_lessons l JOIN school_courses c ON c.id=l.course_id WHERE l.vault_id=$1 AND l.archived_at IS NULL AND l.calendar_event_id IS NULL",[vaultId]),
-    query("SELECT id,title,due,revision FROM school_assignments WHERE vault_id=$1 AND archived_at IS NULL",[vaultId]),
+    query(`SELECT a.id,a.title,a.due,a.revision,s.source_record,s.source_timestamp FROM school_assignments a
+      LEFT JOIN LATERAL (SELECT source_record,source_timestamp FROM school_snapshot_links WHERE vault_id=a.vault_id AND assignment_id=a.id AND record_kind='assignment' AND source_origin='https://assignments.edu.cloud.microsoft' ORDER BY source_timestamp DESC LIMIT 1) s ON true
+      WHERE a.vault_id=$1 AND a.archived_at IS NULL`,[vaultId]),
     query("SELECT id,title,time_spec,revision FROM school_assessments WHERE vault_id=$1 AND archived_at IS NULL",[vaultId]),
     query("SELECT a.id,a.lesson_id,a.record_date,a.time_spec,a.raw_status,a.normalized_status,a.excusal_status,a.revision,l.time_spec AS lesson_time_spec,l.calendar_event_id,c.name AS course_name FROM attendance_records a JOIN school_courses c ON c.id=a.course_id LEFT JOIN school_lessons l ON l.id=a.lesson_id WHERE a.vault_id=$1 AND a.archived_at IS NULL AND a.normalized_status IN ('absent','late') AND a.record_date>=$2::timestamptz::date-1 AND a.record_date<=$3::timestamptz::date+1",[vaultId,input.from,input.to]),
     query("SELECT id,provider,label,state,last_success_at FROM integration_connections WHERE vault_id=$1 AND id=ANY($2::uuid[]) AND provider IN ('microsoft','google_calendar') AND disconnected_at IS NULL ORDER BY label,id",[vaultId,selectedConnectionIds])
@@ -3853,7 +3856,13 @@ app.get("/api/v1/vaults/:vaultId/calendar-view",async(request,reply)=>{
   const dateIsVisible=(date:string)=>date>=firstVisibleDate&&date<=lastVisibleDate;
   const projectSchoolRecord=(row:Record<string,any>,kind:"lesson"|"assignment"|"assessment",title:string,spec:Record<string,any>,layer:"school"|"deadline"|"assessment")=>{if(spec.kind==="exact"){const startsAt=spec.startsAt??spec.dueAt;const endsAt=spec.endsAt??null;if(startsAt&&Date.parse(startsAt)>=Date.parse(input.from)&&Date.parse(startsAt)<Date.parse(input.to)){const attendance=kind==="lesson"?attendanceForClass(attendanceLinks,{lessonId:row.id,startsAt,timezone:input.timezone}):null;if(attendance)mergedAttendanceIds.add(attendance.id);overlayItems.push({id:row.id,kind,title,startsAt,endsAt,layer,attendanceStatus:attendance?.status??null,attendanceLabel:attendance?.label??null,reason:"source_record_not_calendar_event",revision:row.revision});}return;}if(spec.kind==="date_only"&&!dateIsVisible(spec.date))return;unknownTimeMarkers.push({id:row.id,kind,title,date:spec.kind==="date_only"?spec.date:null,reason:spec.kind==="date_only"?"date_only":"time_unknown",revision:row.revision});};
   for(const row of lessonRows.rows)projectSchoolRecord(row,"lesson",`${row.course_name} lesson`,row.time_spec,"school");
-  for(const row of assignmentRows.rows)projectSchoolRecord(row,"assignment",row.title,row.due,"deadline");
+  for(const row of assignmentRows.rows){
+    const itemCount=overlayItems.length,markerCount=unknownTimeMarkers.length;
+    projectSchoolRecord(row,"assignment",row.title,row.due,"deadline");
+    const submission=assignmentSubmission(row.source_record,row.source_timestamp?iso(row.source_timestamp):null,row.due);
+    if(overlayItems.length>itemCount)overlayItems.at(-1)!.submission=submission;
+    if(unknownTimeMarkers.length>markerCount)unknownTimeMarkers.at(-1)!.submission=submission;
+  }
   for(const row of assessmentRows.rows)projectSchoolRecord(row,"assessment",row.title,row.time_spec,"assessment");
   for(const row of attendanceRows.rows){
     if(mergedAttendanceIds.has(row.id))continue;

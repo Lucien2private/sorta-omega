@@ -584,6 +584,18 @@ try {
           loadingIndicators: document.querySelectorAll('[role="progressbar"], [aria-busy="true"], [class*="loading" i]').length,
         }));
         console.log(JSON.stringify({ provider, assignmentListShape: listShape }));
+        if (args.get("probe-assignment-dialog") === "true") {
+          await assignmentsFrame.locator('[role="dialog"], [role="alertdialog"], .fui-DialogSurface').first().waitFor({ timeout: 30_000 }).catch(() => undefined);
+          const dialogs = await assignmentsFrame.locator('[role="dialog"], [role="alertdialog"], .fui-DialogSurface').evaluateAll(elements => elements.map(element => ({
+            text: (element.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 2000),
+            buttons: [...element.querySelectorAll("button")].map(button => ({ label: button.getAttribute("aria-label") ?? button.textContent, disabled: button.disabled })),
+          })));
+          console.log(JSON.stringify({ provider, assignmentDialogs: dialogs }));
+          console.log(JSON.stringify({ provider, teamsDialogs: await probe.locator('[role="dialog"], [role="alertdialog"], .fui-DialogSurface').evaluateAll(elements => elements.map(element => ({
+            text: (element.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 2000),
+            buttons: [...element.querySelectorAll("button")].map(button => ({ label: button.getAttribute("aria-label") ?? button.textContent, disabled: button.disabled })),
+          }))) }));
+        }
         if (args.get("probe-assignment-settle") === "true") {
           const counts = [];
           const completed = assignmentsFrame.getByRole("tab", { name: /Completed/i });

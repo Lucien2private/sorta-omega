@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { CalendarView } from "@sorta/contracts";
+import { AssignmentStatus, assignmentStatusClass } from "./AssignmentStatus";
 import { placeTimelineDay, timelineBounds, timelineDateKey, timelineInitialScrollLeft, timelineMinute, type TimelineItem } from "./calendar-timeline";
 
 type Props = {
@@ -53,16 +54,18 @@ export function CalendarTimeline({ days, items, markers, timezone }: Props) {
       {deadlines.some(item => dates.includes(timelineDateKey(item.startsAt, timezone))) && <div className="calendar-timeline-dated" aria-label="Assignment deadlines">
         <div className="calendar-timeline-dated-label">Due</div>
         {dates.map(date => <div className="calendar-timeline-dated-day" key={date}>
-          {deadlines.filter(item => timelineDateKey(item.startsAt, timezone) === date).map(item => <div className="calendar-timeline-marker deadline" key={item.id} title={`${item.title} · due ${time(item.startsAt)}`}>
+          {deadlines.filter(item => timelineDateKey(item.startsAt, timezone) === date).map(item => <div className={`calendar-timeline-marker deadline ${assignmentStatusClass(item.submission)}`} key={item.id} title={`${item.title} · due ${time(item.startsAt)}`}>
             <strong>{item.title}</strong><small>Due {time(item.startsAt)}</small>
+            <AssignmentStatus submission={item.submission}/>
           </div>)}
         </div>)}
       </div>}
       {markers.some(marker => dates.includes(marker.date ?? "")) && <div className="calendar-timeline-dated">
         <div className="calendar-timeline-dated-label">Time unknown</div>
         {dates.map(date => <div className="calendar-timeline-dated-day" key={date}>
-          {markers.filter(marker => marker.date === date).map(marker => <div className={`calendar-timeline-marker ${marker.kind} ${marker.attendanceStatus ? `attendance-${marker.attendanceStatus}` : ""}`} key={`${marker.kind}-${marker.id}`} title="Date known; exact time not stated">
+          {markers.filter(marker => marker.date === date).map(marker => <div className={`calendar-timeline-marker ${marker.kind} ${marker.attendanceStatus ? `attendance-${marker.attendanceStatus}` : ""} ${assignmentStatusClass(marker.submission)}`} key={`${marker.kind}-${marker.id}`} title="Date known; exact time not stated">
             <strong>{marker.title}</strong><small>{marker.kind === "attendance" ? marker.attendanceStatus === "absent" ? "Absent" : marker.attendanceStatus === "late" ? "Late" : "Attendance" : marker.kind} · time unknown</small>
+            <AssignmentStatus submission={marker.submission}/>
           </div>)}
         </div>)}
       </div>}

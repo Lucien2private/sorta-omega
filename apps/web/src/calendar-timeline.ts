@@ -1,3 +1,5 @@
+import type { AssignmentSubmission } from "./AssignmentStatus";
+
 export type TimelineItem = {
   id: string;
   title: string;
@@ -7,6 +9,7 @@ export type TimelineItem = {
   attendanceStatus: "present" | "absent" | "late" | "unknown" | null;
   attendanceLabel: string | null;
   detail: string;
+  submission?: AssignmentSubmission;
 };
 
 export type PlacedTimelineItem<T extends TimelineItem> = T & {
