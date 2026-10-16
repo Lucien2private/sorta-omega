@@ -38,6 +38,11 @@ try {
     });
     if (authPages.length !== 1) throw new Error("teams_assignment_auth_window_not_unique");
     const authPage = authPages[0];
+    if (args.get("probe-assignment-stay-signed-in") === "true") {
+      await authPage.getByText("Stay signed in?", { exact: true }).waitFor({ timeout: 10_000 });
+      await authPage.getByRole("button", { name: "Yes", exact: true }).click();
+      console.log(JSON.stringify({ provider, assignmentAuthWindow: { staySignedInAccepted: true, importVerified: false } }));
+    } else {
     if (args.get("probe-assignment-authenticator") === "true") {
       const approve = authPage.getByRole("button", { name: "Approve a request on my Microsoft Authenticator app", exact: true });
       if (await approve.count() !== 1) throw new Error("teams_assignment_authenticator_option_not_unique");
@@ -54,6 +59,7 @@ try {
       const tempRoot = path.resolve(process.env.LOCALAPPDATA ?? "", "Temp");
       if (!path.isAbsolute(authScreenshot) || path.dirname(path.resolve(authScreenshot)) !== tempRoot || !/^sorta-teams-mfa-[a-z0-9-]+\.png$/.test(path.basename(authScreenshot))) throw new Error("teams_assignment_auth_screenshot_path_invalid");
       await authPage.screenshot({ path: authScreenshot });
+    }
     }
     authProbed = true;
   }
