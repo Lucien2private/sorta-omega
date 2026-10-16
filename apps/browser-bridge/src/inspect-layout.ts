@@ -46,7 +46,7 @@ try {
     }
     console.log(JSON.stringify({ provider, assignmentAuthWindow: {
       text: (await authPage.locator("body").innerText()).slice(0, 6000),
-      buttons: await authPage.locator('button, input[type="submit"], [role="button"]').evaluateAll(elements => elements.map(element => ({ label: element.getAttribute("aria-label") ?? element.textContent ?? element.getAttribute("value") }))),
+      buttons: await authPage.locator('button, input[type="button"], input[type="submit"], [role="button"]').evaluateAll(elements => elements.map(element => ({ label: element.getAttribute("aria-label") || element.textContent || element.getAttribute("value") }))),
       fields: await authPage.locator("input").evaluateAll(elements => elements.map(element => ({ type: element.getAttribute("type"), label: element.getAttribute("aria-label"), placeholder: element.getAttribute("placeholder") }))),
     } }));
     const authScreenshot = args.get("auth-screenshot");
