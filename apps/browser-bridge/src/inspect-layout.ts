@@ -32,6 +32,31 @@ try {
     try { const origin = new URL(candidate.url()).origin; return provider === "teams" ? ["https://teams.microsoft.com", "https://teams.cloud.microsoft"].includes(origin) : origin === expectedOrigin; } catch { return false; }
   });
   let authProbed = false;
+  if (provider === "teams" && args.get("probe-assignment-auth-window") === "true") {
+    const authPages = browser.contexts().flatMap(context => context.pages()).filter(candidate => {
+      try { return new URL(candidate.url()).origin === "https://login.microsoftonline.com"; } catch { return false; }
+    });
+    if (authPages.length !== 1) throw new Error("teams_assignment_auth_window_not_unique");
+    const authPage = authPages[0];
+    if (args.get("probe-assignment-authenticator") === "true") {
+      const approve = authPage.getByRole("button", { name: "Approve a request on my Microsoft Authenticator app", exact: true });
+      if (await approve.count() !== 1) throw new Error("teams_assignment_authenticator_option_not_unique");
+      await approve.click();
+      await approve.waitFor({ state: "hidden", timeout: 15_000 });
+    }
+    console.log(JSON.stringify({ provider, assignmentAuthWindow: {
+      text: (await authPage.locator("body").innerText()).slice(0, 6000),
+      buttons: await authPage.locator('button, input[type="submit"], [role="button"]').evaluateAll(elements => elements.map(element => ({ label: element.getAttribute("aria-label") ?? element.textContent ?? element.getAttribute("value") }))),
+      fields: await authPage.locator("input").evaluateAll(elements => elements.map(element => ({ type: element.getAttribute("type"), label: element.getAttribute("aria-label"), placeholder: element.getAttribute("placeholder") }))),
+    } }));
+    const authScreenshot = args.get("auth-screenshot");
+    if (authScreenshot) {
+      const tempRoot = path.resolve(process.env.LOCALAPPDATA ?? "", "Temp");
+      if (!path.isAbsolute(authScreenshot) || path.dirname(path.resolve(authScreenshot)) !== tempRoot || !/^sorta-teams-mfa-[a-z0-9-]+\.png$/.test(path.basename(authScreenshot))) throw new Error("teams_assignment_auth_screenshot_path_invalid");
+      await authPage.screenshot({ path: authScreenshot });
+    }
+    authProbed = true;
+  }
   if (!page && provider === "inschool" && args.get("probe-inschool-auth") === "true") {
     const probe = await browser.contexts()[0].newPage();
     try {
