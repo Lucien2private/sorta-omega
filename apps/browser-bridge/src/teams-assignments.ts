@@ -137,8 +137,10 @@ export async function collectTeamsAssignments(signedInPage: Page): Promise<Teams
       await probe.waitForTimeout(250);
     }
     if (!listReady) throw new Error("teams_assignment_list_navigation_unavailable");
-    stage = "list_tabs_wait";
-    await frame.getByRole("tab", { name: /^Upcoming\b/i }).waitFor({ timeout: 25_000 });
+    stage = "list_loaded_wait";
+    // Upcoming renders in the loading shell too. Require the full section
+    // navigation before treating a cardless section as empty.
+    await frame.getByRole("tab", { name: /^Completed\b/i }).waitFor({ timeout: 90_000 });
     const listUrl = frame.url();
     const parsedList = new URL(listUrl);
     if (parsedList.origin !== assignmentOrigin || parsedList.pathname !== "/classes/all/list" || parsedList.search || parsedList.hash) throw new Error("teams_assignment_list_route_changed");
