@@ -11,6 +11,7 @@ import { collectTeamsClassPosts } from "./teams-channels.js";
 import { collectTeamsChats } from "./teams-chats.js";
 import { collectTeamsPowerpoints } from "./teams-powerpoints.js";
 import { collectTeamsAssignmentFiles } from "./teams-assignment-files.js";
+import { missingSchoolTabError } from "./school-session.js";
 import type { TeamsAssignmentSnapshot } from "./teams-assignments.js";
 
 const args=new Map<string,string>();for(let index=2;index<process.argv.length;index+=2){const key=process.argv[index],value=process.argv[index+1];if(!key?.startsWith("--")||!value)throw new Error("usage: browser-bridge --provider teams|inschool --output <absolute-json-file> [--origin https://county.inschool.visma.no] (--profile <absolute-directory> OR --cdp http://127.0.0.1:9222 OR --cdp-profile <absolute-directory> --noninteractive true)");args.set(key.slice(2),value);}
@@ -88,7 +89,7 @@ if(!context){await browser?.close();throw new Error("browser_bridge_cdp_context_
 const pages=context.pages(),existing=cdp?pages.find(candidate=>{try{const url=new URL(candidate.url());return provider?.startsWith("teams")?['teams.microsoft.com','teams.cloud.microsoft'].includes(url.hostname):url.hostname.endsWith(".inschool.visma.no");}catch{return false;}}):null;
 const terminal=createInterface({input,output});
 try{
-  if(cdp&&!existing)throw new Error("browser_bridge_matching_signed_in_tab_not_found");
+  if(cdp&&!existing)throw new Error(missingSchoolTabError(provider!,pages.map(candidate=>candidate.url())));
   const page=existing??pages[0]??await context.newPage();
   if(provider==="teams-powerpoints"){
     assertAllowed(page);
