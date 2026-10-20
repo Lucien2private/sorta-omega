@@ -36,6 +36,7 @@ try {
   if (provider === "inschool" && args.get("probe-inschool-reconnect") === "true") {
     if (!page || new URL(page.url()).origin !== expectedOrigin) throw new Error("inschool_reconnect_tab_missing");
     const login = page.getByRole("button", { name: "Logg inn med Feide", exact: true });
+    await login.first().waitFor({ state: "visible", timeout: 15_000 });
     if (await login.count() !== 1) throw new Error("inschool_reconnect_control_not_unique");
     await login.click({ timeout: 10_000 });
     await page.waitForTimeout(5_000);
