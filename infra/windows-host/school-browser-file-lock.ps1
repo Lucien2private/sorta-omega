@@ -5,7 +5,8 @@ function Enter-SchoolBrowserFileLock {
   $hasher = [Security.Cryptography.SHA256]::Create()
   try { $key = [BitConverter]::ToString($hasher.ComputeHash([Text.Encoding]::UTF8.GetBytes($canonical))).Replace('-', '') }
   finally { $hasher.Dispose() }
-  $mutex = [Threading.Mutex]::new($false, ('Local\SortaOmegaSchoolFiles-' + $key))
+  # SSH and interactive scheduled tasks can run in different Windows sessions.
+  $mutex = [Threading.Mutex]::new($false, ('Global\SortaOmegaSchoolFiles-' + $key))
   try {
     try { $held = $mutex.WaitOne([TimeSpan]::FromSeconds($WaitSeconds)) }
     catch [Threading.AbandonedMutexException] { $held = $true }
