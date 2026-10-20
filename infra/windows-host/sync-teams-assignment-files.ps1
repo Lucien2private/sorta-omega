@@ -22,7 +22,10 @@ $batchName = 'personal-' + [Guid]::NewGuid().ToString('N')
 $batchRoot = [IO.Path]::GetFullPath((Join-Path $spool $batchName)).TrimEnd('\')
 if ([IO.Path]::GetDirectoryName($snapshotPath) -ne $spool -or $snapshotName -notmatch '^teams-assignments-[0-9a-f]{32}\.json$' -or [IO.Path]::GetDirectoryName($batchRoot) -ne $spool -or $batchName -notmatch '^personal-[0-9a-f]{32}$') { throw 'Unsafe Teams assignment-file staging path.' }
 
+$fileCaptureMutex = $null
+. (Join-Path $PSScriptRoot 'school-browser-file-lock.ps1')
 try {
+  $fileCaptureMutex = Enter-SchoolBrowserFileLock -ProfilePath $ProfilePath
   $sql = @'
 SELECT jsonb_build_object(
   'version','omega_teams_assignments_json_v1',
@@ -82,6 +85,8 @@ WHERE vault_id='00000000-0000-4000-8000-000000000001' AND source_origin='https:/
   [IO.File]::AppendAllText($statusLog, (([ordered]@{at=(Get-Date).ToUniversalTime().ToString('o');status='failed';reason=$message} | ConvertTo-Json -Compress) + "`n"))
   throw
 } finally {
+  try {
   if (Test-Path -LiteralPath $snapshotPath) { Remove-Item -LiteralPath $snapshotPath -Force }
   if (Test-Path -LiteralPath $batchRoot) { Remove-Item -LiteralPath $batchRoot -Recurse -Force }
+  } finally { Exit-SchoolBrowserFileLock -Mutex $fileCaptureMutex }
 }

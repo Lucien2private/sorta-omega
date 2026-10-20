@@ -17,7 +17,10 @@ $statusDirectory = Split-Path -Parent $ProfilePath
 New-Item -ItemType Directory -Path $statusDirectory -Force | Out-Null
 $statusLog = Join-Path $statusDirectory 'teams-assignments-sync-status.jsonl'
 
+$fileCaptureMutex = $null
+. (Join-Path $PSScriptRoot 'school-browser-file-lock.ps1')
 try {
+  if ($CaptureFiles) { $fileCaptureMutex = Enter-SchoolBrowserFileLock -ProfilePath $ProfilePath }
   $bridge = Join-Path $RepositoryRoot 'apps\browser-bridge\dist\cli.js'
   $compiler = Join-Path $RepositoryRoot 'apps\browser-bridge\node_modules\.bin\tsc.cmd'
   $bridgeProject = Join-Path $RepositoryRoot 'apps\browser-bridge\tsconfig.json'
@@ -121,4 +124,6 @@ try {
   if ($message.Length -gt 240) { $message = $message.Substring(0,240) }
   [IO.File]::AppendAllText($statusLog, (([ordered]@{at=(Get-Date).ToUniversalTime().ToString('o');status='failed';reason=$message} | ConvertTo-Json -Compress) + "`n"))
   throw
+} finally {
+  Exit-SchoolBrowserFileLock -Mutex $fileCaptureMutex
 }

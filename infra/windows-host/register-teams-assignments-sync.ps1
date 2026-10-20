@@ -3,6 +3,7 @@ param(
   [string]$AppContainer,
   [switch]$FromInSchoolTask,
   [switch]$RunOnce,
+  [switch]$MetadataOnly,
   [switch]$DryRun
 )
 
@@ -28,15 +29,17 @@ if (-not (Test-Path -LiteralPath $script)) { throw 'The Teams sync script is mis
 $repository = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $profile = Join-Path $env:LOCALAPPDATA 'SortaOmega\BrowserBridge\EdgeUserData'
 if ($RunOnce) {
-  & $script -VaultId $VaultId -AppContainer $AppContainer -RepositoryRoot $repository -ProfilePath $profile -DryRun:$DryRun
+  & $script -VaultId $VaultId -AppContainer $AppContainer -RepositoryRoot $repository -ProfilePath $profile -CaptureFiles:(-not $MetadataOnly) -DryRun:$DryRun
   return
 }
 $arguments = '-NoProfile -ExecutionPolicy Bypass -File "{0}" -VaultId {1} -AppContainer {2} -RepositoryRoot "{3}" -ProfilePath "{4}"' -f $script,$VaultId,$AppContainer,$repository,$profile
+if (-not $MetadataOnly) { $arguments += ' -CaptureFiles' }
 $action = New-ScheduledTaskAction -Execute (Join-Path $PSHOME 'powershell.exe') -Argument $arguments
 $next = (Get-Date).Date.AddHours((Get-Date).Hour).AddMinutes(20)
 if ($next -le (Get-Date)) { $next = $next.AddHours(1) }
 $trigger = New-ScheduledTaskTrigger -Once -At $next -RepetitionInterval (New-TimeSpan -Hours 1) -RepetitionDuration (New-TimeSpan -Days 3650)
-$settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes 20) -MultipleInstances IgnoreNew
+$timeLimit = if ($MetadataOnly) { 20 } else { 45 }
+$settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes $timeLimit) -MultipleInstances IgnoreNew
 $principal = New-ScheduledTaskPrincipal -UserId "$env:COMPUTERNAME\$env:USERNAME" -LogonType Interactive -RunLevel Limited
-Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Description 'Refresh Teams Assignments across class-filtered Upcoming, Past due, and Completed views through the separately signed-in Edge profile. Pagination and attachments are not verified.' | Out-Null
+Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Description 'Refresh class-filtered Teams assignment details and, unless MetadataOnly was selected, rendered PPTX/PDF/DOCX/XLSX resources. School file captures share a profile lock; pagination and submission-file coverage remain incomplete.' | Out-Null
 Get-ScheduledTask -TaskName $taskName | Select-Object TaskName,State

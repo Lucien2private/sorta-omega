@@ -18,7 +18,10 @@ $batchName = 'personal-' + [Guid]::NewGuid().ToString('N')
 $batchRoot = [IO.Path]::GetFullPath((Join-Path $spool $batchName)).TrimEnd('\')
 if ([IO.Path]::GetDirectoryName($batchRoot) -ne $spool -or $batchName -notmatch '^personal-[0-9a-f]{32}$') { throw 'Unsafe Teams PowerPoint staging path.' }
 
+$fileCaptureMutex = $null
+. (Join-Path $PSScriptRoot 'school-browser-file-lock.ps1')
 try {
+  $fileCaptureMutex = Enter-SchoolBrowserFileLock -ProfilePath $ProfilePath
   $bridge = Join-Path $RepositoryRoot 'apps\browser-bridge\dist\cli.js'
   $compiler = Join-Path $RepositoryRoot 'apps\browser-bridge\node_modules\.bin\tsc.cmd'
   $bridgeProject = Join-Path $RepositoryRoot 'apps\browser-bridge\tsconfig.json'
@@ -74,6 +77,7 @@ try {
   [IO.File]::AppendAllText($statusLog, (([ordered]@{ at = (Get-Date).ToUniversalTime().ToString('o'); status = 'failed'; reason = $message } | ConvertTo-Json -Compress) + "`n"))
   throw
 } finally {
+  try {
   if (Test-Path -LiteralPath $batchRoot) {
     try {
       Remove-Item -LiteralPath $batchRoot -Recurse -Force -ErrorAction Stop
@@ -84,6 +88,7 @@ try {
       throw
     }
   }
+  } finally { Exit-SchoolBrowserFileLock -Mutex $fileCaptureMutex }
 }
 
 # A successful import is not a completed run until its temporary files are gone.
