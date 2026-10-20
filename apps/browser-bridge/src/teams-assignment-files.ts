@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Frame, Page } from "playwright-core";
+import { openTeamsNavigation } from "./teams-navigation.js";
 import { assignmentClassCombo, retryAssignmentListReturn, selectAssignmentClass, waitForAssignmentListSettled, type TeamsAssignmentSnapshot } from "./teams-assignments.js";
 import { assignmentSchoolFileRelativePath, schoolFileByteLimit, validateSchoolOriginal } from "./teams-powerpoints.js";
 
@@ -46,10 +47,7 @@ export async function collectTeamsAssignmentFiles(source: Page, snapshot: TeamsA
   try {
     await probe.goto(source.url(), { waitUntil: "domcontentloaded", timeout: 30_000 });
     stage = "navigation";
-    const nav = probe.getByRole("button", { name: /^Assignments \(Ctrl\+Shift\+4\)$/ });
-    await nav.waitFor({ timeout: 25_000 });
-    if (await nav.count() !== 1) throw new Error("teams_assignment_files_navigation_ambiguous");
-    await nav.click();
+    await openTeamsNavigation(probe, "assignments");
     let frame: Frame | null = null;
     for (let attempt = 0; attempt < 100 && !frame; attempt++) {
       try { frame = assignmentFrame(probe); } catch { await probe.waitForTimeout(250); }

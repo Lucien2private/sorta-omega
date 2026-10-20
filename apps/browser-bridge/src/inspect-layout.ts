@@ -2,6 +2,7 @@ import { chromium } from "playwright-core";
 import { createHash } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
+import { openTeamsNavigation } from "./teams-navigation.js";
 
 // Development-only structural probe. Section table previews can include private
 // record text; run locally only and never save its output to the public repo.
@@ -32,6 +33,23 @@ try {
     try { const origin = new URL(candidate.url()).origin; return provider === "teams" ? ["https://teams.microsoft.com", "https://teams.cloud.microsoft"].includes(origin) : origin === expectedOrigin; } catch { return false; }
   });
   let authProbed = false;
+  if (provider === "teams" && args.has("probe-navigation")) {
+    const section = args.get("probe-navigation");
+    if (!page || !["assignments", "teams", "chat"].includes(section ?? "")) throw new Error("teams_probe_navigation_invalid");
+    const probe = await page.context().newPage();
+    try {
+      await probe.goto(page.url(), { waitUntil: "domcontentloaded", timeout: 30_000 });
+      await openTeamsNavigation(probe, section as "assignments" | "teams" | "chat");
+      await probe.waitForTimeout(5_000);
+      console.log(JSON.stringify({ provider, navigationProbe: { section,
+        classCards: await probe.locator('.fui-AccordionItem [role="group"]').count(),
+        assignmentFrames: probe.frames().filter(frame => frame.url().startsWith("https://assignments.edu.cloud.microsoft/")).length,
+        chatRows: await probe.locator('[role="treeitem"][data-item-type="chat"]').count(),
+        permissionRequired: await probe.locator('.fui-DialogSurface').filter({ hasText: /We need to ask for additional permissions\./i }).isVisible().catch(() => false),
+      } }));
+    } finally { await probe.close(); }
+    authProbed = true;
+  }
   if (provider === "teams" && args.get("probe-assignment-progress") === "true") {
     const progress = [];
     for (const candidate of browser.contexts().flatMap(context => context.pages())) {
@@ -931,6 +949,10 @@ try {
       routeShape: `${location.pathname}${location.hash}`.split("/").map(segment => /\d/.test(segment) || segment.length > 40 ? "*" : segment).join("/").slice(0, 120),
       passwordFields: document.querySelectorAll('input[type="password"]').length,
       loginPrompt: /logg inn|sign in|feide/i.test(document.body?.innerText?.slice(0, 3_000) ?? ""),
+      signInControls: [...document.querySelectorAll<HTMLElement>('a, button, [role="button"]')].map(element => ({
+        label: (element.getAttribute("aria-label") ?? element.textContent ?? "").trim(),
+        tag: element.tagName.toLowerCase(),
+      })).filter(item => /feide|logg inn|sign in/i.test(item.label) && item.label.length < 100),
       weekHeading: document.querySelector(".userTimetable_currentWeek")?.textContent?.trim() ?? null,
       lessonCount: document.querySelectorAll(".Timetable-TimetableItem[starttimeanddateunix]").length,
       controls: [...document.querySelectorAll<HTMLButtonElement>(".userTimetable_moveWeekButton")].map((button, index) => ({

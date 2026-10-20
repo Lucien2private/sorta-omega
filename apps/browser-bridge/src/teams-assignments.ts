@@ -1,4 +1,5 @@
 import type { Frame, Page } from "playwright-core";
+import { openTeamsNavigation } from "./teams-navigation.js";
 
 export type TeamsAssignmentSnapshot = {
   version: "omega_teams_assignments_json_v1";
@@ -109,10 +110,7 @@ export async function collectTeamsAssignments(signedInPage: Page): Promise<Teams
     await probe.goto(signedInPage.url(), { waitUntil: "domcontentloaded", timeout: 30_000 });
     if (!teamsOrigins.has(new URL(probe.url()).origin)) throw new Error("teams_probe_left_registered_origin");
     stage = "navigation";
-    const nav = probe.getByRole("button", { name: /^Assignments \(Ctrl\+Shift\+4\)$/ });
-    await nav.waitFor({ timeout: 25_000 });
-    if (await nav.count() !== 1) throw new Error("teams_assignments_navigation_ambiguous");
-    await nav.click();
+    await openTeamsNavigation(probe, "assignments");
     let frame: Frame | null = null;
     for (let attempt = 0; attempt < 100 && !frame; attempt++) {
       try { frame = assignmentFrame(probe); } catch { await probe.waitForTimeout(250); }

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { Page } from "playwright-core";
+import { openTeamsNavigation } from "./teams-navigation.js";
 
 type Note = { id: string; title: string; body: string; path: string };
 type RenderedPost = { messageId: string; chainId: string; text: string; isReply: boolean };
@@ -68,9 +69,7 @@ export async function collectTeamsClassPosts(source: Page): Promise<{ notes: Not
   const probe = await context.newPage();
   try {
     await probe.goto(source.url(), { waitUntil: "domcontentloaded", timeout: 30_000 });
-    const navigation = probe.getByRole("button", { name: /^Teams \(Ctrl\+Shift\+5\)$/ });
-    await navigation.waitFor({ timeout: 20_000 });
-    await navigation.click();
+    await openTeamsNavigation(probe, "teams");
     const classes = probe.locator(".fui-AccordionItem").filter({ hasText: /Classes\s*\d+\s*teams/i });
     await classes.waitFor({ timeout: 20_000 });
     if (await classes.count() !== 1) throw new Error("teams_classes_accordion_ambiguous");

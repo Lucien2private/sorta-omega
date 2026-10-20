@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Frame, Page } from "playwright-core";
+import { openTeamsNavigation } from "./teams-navigation.js";
 
 type Entry = { name: string; rowIndex: number; folder: boolean };
 type ManifestItem = { relativePath: string; stagedName: string; sha256: string; byteLength: number; modifiedAt: string };
@@ -251,9 +252,7 @@ export async function collectTeamsPowerpoints(source: Page, stagingRoot: string,
   await mkdir(path.join(stagingRoot, "files"), { recursive: true });
   try {
     await probe.goto(source.url(), { waitUntil: "domcontentloaded", timeout: 30_000 });
-    let teamsNav = probe.getByRole("button", { name: /^Teams \(Ctrl\+Shift\+5\)$/ });
-    await teamsNav.waitFor({ timeout: 20_000 });
-    await teamsNav.click();
+    await openTeamsNavigation(probe, "teams");
     let classes = probe.locator(".fui-AccordionItem").filter({ hasText: /Classes\s*\d+\s*teams/i });
     await classes.waitFor({ timeout: 20_000 });
     if (await classes.count() !== 1) throw new Error("teams_classes_accordion_ambiguous");
@@ -386,9 +385,7 @@ export async function collectTeamsPowerpoints(source: Page, stagingRoot: string,
         await probe.close();
         probe = await source.context().newPage();
         await probe.goto(source.url(), { waitUntil: "domcontentloaded", timeout: 30_000 });
-        teamsNav = probe.getByRole("button", { name: /^Teams \(Ctrl\+Shift\+5\)$/ });
-        await teamsNav.waitFor({ timeout: 20_000 });
-        await teamsNav.click();
+        await openTeamsNavigation(probe, "teams");
         classes = probe.locator(".fui-AccordionItem").filter({ hasText: /Classes\s*\d+\s*teams/i });
         await classes.waitFor({ timeout: 20_000 });
         if (await classes.count() !== 1) throw new Error("teams_classes_accordion_ambiguous");

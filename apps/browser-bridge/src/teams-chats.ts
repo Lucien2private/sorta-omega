@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { Page } from "playwright-core";
+import { openTeamsNavigation } from "./teams-navigation.js";
 
 type RenderedMessage = { id: string; text: string };
 type Note = { id: string; title: string; body: string; path: string };
@@ -89,10 +90,7 @@ export async function collectTeamsChats(source: Page): Promise<{ notes: Note[]; 
   try {
     await probe.goto(source.url(), { waitUntil: "domcontentloaded", timeout: 30_000 });
     if (!["teams.microsoft.com", "teams.cloud.microsoft"].includes(new URL(probe.url()).hostname)) throw new Error("teams_chat_left_registered_origin");
-    const chat = probe.getByRole("button", { name: /^Chat \(Ctrl\+Shift\+3\)$/ });
-    await chat.waitFor({ timeout: 20_000 });
-    if (await chat.count() !== 1) throw new Error("teams_chat_navigation_ambiguous");
-    await chat.click();
+    await openTeamsNavigation(probe, "chat");
     const row = probe.locator('[role="treeitem"][data-item-type="chat"], [role="treeitem"][data-item-type="muted-chat"]');
     await row.first().waitFor({ timeout: 15_000 });
     const keys = await collectConversationKeys(probe);
