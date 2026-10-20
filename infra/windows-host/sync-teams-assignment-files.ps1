@@ -24,25 +24,27 @@ if ([IO.Path]::GetDirectoryName($snapshotPath) -ne $spool -or $snapshotName -not
 
 $fileCaptureMutex = $null
 . (Join-Path $PSScriptRoot 'school-browser-file-lock.ps1')
+. (Join-Path $PSScriptRoot 'school-snapshot-encoding.ps1')
 try {
   $fileCaptureMutex = Enter-SchoolBrowserFileLock -ProfilePath $ProfilePath
   $sql = @'
-SELECT jsonb_build_object(
+SELECT replace(encode(convert_to(jsonb_build_object(
   'version','omega_teams_assignments_json_v1',
   'source_timestamp',max(source_timestamp),
   'source_origin','https://assignments.edu.cloud.microsoft',
   'coverage',jsonb_build_object('listRoute','/classes/all/list','visibleCardCount',count(*),'capturedDetailCount',count(*),'complete',false,'limitation','Reused latest imported source records for file acquisition.'),
   'records',jsonb_agg(source_record ORDER BY external_id)
-)::text
+)::text,'UTF8'),'base64'),chr(10),'')
 FROM school_snapshot_links
 WHERE vault_id='00000000-0000-4000-8000-000000000001' AND source_origin='https://assignments.edu.cloud.microsoft' AND record_kind='assignment';
 '@
   if ($VaultId -ne '00000000-0000-4000-8000-000000000001') { throw 'This export query is scoped to the configured personal vault.' }
   $sourceLines = @(& docker exec sorta-omega-git-postgres-1 psql -X -v ON_ERROR_STOP=1 -U sorta -d sorta_omega -q -t -A -c $sql)
   if ($LASTEXITCODE -ne 0 -or $sourceLines.Count -ne 1) { throw 'Could not export the latest Teams assignment source records.' }
-  $snapshot = $sourceLines[0] | ConvertFrom-Json
+  $snapshotText = ConvertFrom-SchoolSnapshotBase64 -Encoded $sourceLines[0]
+  $snapshot = $snapshotText | ConvertFrom-Json
   if ($snapshot.version -ne 'omega_teams_assignments_json_v1' -or @($snapshot.records).Count -lt 1 -or @($snapshot.records).Count -gt 500 -or ([datetime]::UtcNow - [datetime]$snapshot.source_timestamp).TotalHours -gt 24) { throw 'The latest Teams assignment source records are empty, stale, or invalid.' }
-  [IO.File]::WriteAllText($snapshotPath, $sourceLines[0], [Text.UTF8Encoding]::new($false))
+  [IO.File]::WriteAllText($snapshotPath, $snapshotText, [Text.UTF8Encoding]::new($false))
 
   $bridge = Join-Path $RepositoryRoot 'apps\browser-bridge\dist\cli.js'
   $compiler = Join-Path $RepositoryRoot 'apps\browser-bridge\node_modules\.bin\tsc.cmd'
