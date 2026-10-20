@@ -968,6 +968,9 @@ try {
       signInControls: [...document.querySelectorAll<HTMLElement>('a, button, [role="button"]')].map(element => ({
         label: (element.getAttribute("aria-label") ?? element.textContent ?? "").trim(),
         tag: element.tagName.toLowerCase(),
+        hidden: element.getBoundingClientRect().width === 0 || element.getBoundingClientRect().height === 0,
+        ariaHidden: element.getAttribute("aria-hidden"),
+        text: (element.textContent ?? "").trim(),
       })).filter(item => /feide|logg inn|sign in/i.test(item.label) && item.label.length < 100),
       weekHeading: document.querySelector(".userTimetable_currentWeek")?.textContent?.trim() ?? null,
       lessonCount: document.querySelectorAll(".Timetable-TimetableItem[starttimeanddateunix]").length,
