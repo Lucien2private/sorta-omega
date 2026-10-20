@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Frame, Page } from "playwright-core";
 import { openTeamsNavigation } from "./teams-navigation.js";
 import { assignmentClassCombo, retryAssignmentListReturn, selectAssignmentClass, waitForAssignmentListSettled, type TeamsAssignmentSnapshot } from "./teams-assignments.js";
-import { assignmentSchoolFileRelativePath, schoolFileByteLimit, validateSchoolOriginal } from "./teams-powerpoints.js";
+import { assignmentSchoolFileRelativePath, readSchoolDownload } from "./teams-powerpoints.js";
 
 const assignmentOrigin = "https://assignments.edu.cloud.microsoft";
 const supportedFile = /\.(?:pptx|pdf|docx|xlsx)$/i;
@@ -141,18 +141,9 @@ export async function collectTeamsAssignmentFiles(source: Page, snapshot: TeamsA
               if (await action.count() !== 1) throw new Error("teams_assignment_files_download_action_missing");
               stage = `download_event_${recordIndex}_${index}`;
               const download = await Promise.all([probe.waitForEvent("download", { timeout: 30_000 }), action.click({ timeout: 10_000, noWaitAfter: true })]).then(([item]) => item);
-              let timer: ReturnType<typeof setTimeout> | undefined;
-              stage = `download_path_${recordIndex}_${index}`;
-              const filePath = await Promise.race([download.path(), new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("teams_assignment_files_download_timeout")), 60_000); })]).finally(() => { if (timer) clearTimeout(timer); });
-              stage = `download_stat_${recordIndex}_${index}`;
-              const metadata = await stat(filePath);
               stage = `download_validate_${recordIndex}_${index}`;
-              if (!metadata.isFile() || metadata.size < 1 || metadata.size > schoolFileByteLimit(name) || bytes + metadata.size > maxBatchBytes) throw new Error("teams_assignment_files_download_size_invalid");
-              if (!download.suggestedFilename().toLowerCase().endsWith(name.slice(name.lastIndexOf(".")).toLowerCase())) throw new Error("teams_assignment_files_download_type_changed");
-              stage = `download_read_${recordIndex}_${index}`;
-              const contents = await readFile(filePath);
-              stage = `download_signature_${recordIndex}_${index}`;
-              validateSchoolOriginal(name, contents);
+              const contents = await readSchoolDownload(download, stagingRoot, name, bytes);
+              if (bytes + contents.length > maxBatchBytes) throw new Error("teams_assignment_files_download_size_invalid");
               stage = `download_stage_${recordIndex}_${index}`;
               const sha256 = createHash("sha256").update(contents).digest("hex");
               const stagedPath = path.join(stagingRoot, "files", sha256);
