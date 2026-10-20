@@ -81,6 +81,16 @@ export function skippableSchoolFileError(error: unknown): string | null {
   return error instanceof Error && retryableDownloadErrors.has(error.message) ? error.message : null;
 }
 
+export function schoolDownloadFailureKind(error: unknown): string {
+  const message = error instanceof Error ? error.message : "";
+  if (/cancel(?:led|ed)/i.test(message)) return "cancelled";
+  if (/ENOENT|no such file/i.test(message)) return "missing_file";
+  if (/EACCES|EPERM|access.*denied/i.test(message)) return "access_denied";
+  if (/closed|disconnected/i.test(message)) return "browser_closed";
+  if (/net::ERR_|network|connection.*reset/i.test(message)) return "network";
+  return "other";
+}
+
 export async function readSchoolDownload(download: Pick<Download, "saveAs" | "suggestedFilename" | "cancel">, stagingRoot: string, fileName: string, bytesSoFar: number): Promise<Buffer> {
   const filePath = path.join(stagingRoot, "files", `${randomUUID()}.download`);
   try {
@@ -93,6 +103,7 @@ export async function readSchoolDownload(download: Pick<Download, "saveAs" | "su
           await saving.catch(() => {});
           throw new Error("teams_powerpoint_download_path_timeout");
         }
+        console.log(JSON.stringify({ provider: "teams-powerpoints", downloadFailureKind: schoolDownloadFailureKind(error) }));
         throw new Error("teams_powerpoint_download_path_failed");
       })
       .finally(() => { if (timer) clearTimeout(timer); });

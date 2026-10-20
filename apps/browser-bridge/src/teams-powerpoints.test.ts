@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { assignmentSchoolFileRelativePath, postSchoolFileRelativePath, readSchoolDownload, retryInvalidDownload, safeSegment, schoolFileByteLimit, skippableSchoolFileError, validateSchoolOriginal } from "./teams-powerpoints.js";
+import { assignmentSchoolFileRelativePath, postSchoolFileRelativePath, readSchoolDownload, retryInvalidDownload, safeSegment, schoolDownloadFailureKind, schoolFileByteLimit, skippableSchoolFileError, validateSchoolOriginal } from "./teams-powerpoints.js";
 
 describe("Teams PowerPoint path segments", () => {
   it("removes path separators without losing Norwegian names", () => {
@@ -17,6 +17,15 @@ describe("Teams PowerPoint path segments", () => {
 });
 
 describe("Teams PowerPoint download retry", () => {
+  it("reports only a failure category, never a private URL or filesystem path", () => {
+    expect(schoolDownloadFailureKind(new Error("download.saveAs: canceled https://private.example/?token=secret"))).toBe("cancelled");
+    expect(schoolDownloadFailureKind(new Error("ENOENT C:\\private\\file"))).toBe("missing_file");
+    expect(schoolDownloadFailureKind(new Error("EACCES private"))).toBe("access_denied");
+    expect(schoolDownloadFailureKind(new Error("Target page closed"))).toBe("browser_closed");
+    expect(schoolDownloadFailureKind(new Error("net::ERR_CONNECTION_RESET"))).toBe("network");
+    expect(schoolDownloadFailureKind(new Error("private unknown reason"))).toBe("other");
+  });
+
   it("saves a download into controlled staging and removes the transient copy", async () => {
     const stagingRoot = await mkdtemp(path.join(tmpdir(), "sorta-teams-download-"));
     try {
