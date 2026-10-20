@@ -11,7 +11,7 @@ import { collectTeamsClassPosts } from "./teams-channels.js";
 import { collectTeamsChats } from "./teams-chats.js";
 import { collectTeamsPowerpoints } from "./teams-powerpoints.js";
 import { collectTeamsAssignmentFiles } from "./teams-assignment-files.js";
-import { missingSchoolTabError } from "./school-session.js";
+import { missingSchoolTabError, schoolBrowserConnectionOptions } from "./school-session.js";
 import type { TeamsAssignmentSnapshot } from "./teams-assignments.js";
 
 const args=new Map<string,string>();for(let index=2;index<process.argv.length;index+=2){const key=process.argv[index],value=process.argv[index+1];if(!key?.startsWith("--")||!value)throw new Error("usage: browser-bridge --provider teams|inschool --output <absolute-json-file> [--origin https://county.inschool.visma.no] (--profile <absolute-directory> OR --cdp http://127.0.0.1:9222 OR --cdp-profile <absolute-directory> --noninteractive true)");args.set(key.slice(2),value);}
@@ -83,7 +83,7 @@ async function moveInSchoolWeek(page:Page,direction:-1|1){
 
 async function scrollToOldest(page:Page){for(let attempt=0,stable=0,previous="";attempt<200&&stable<4;attempt++){const state=await page.evaluate(()=>{const candidates=[...document.querySelectorAll<HTMLElement>('[data-tid="message-pane-list-runway"], [role="log"], [data-tid="chat-pane-list"]')],target=candidates.sort((a,b)=>b.scrollHeight-a.scrollHeight)[0];if(!target)return"missing";target.scrollTop=0;return`${target.scrollHeight}:${target.textContent?.slice(0,200)??""}`;});stable=state===previous?stable+1:0;previous=state;await page.waitForTimeout(750);}}
 
-const browser:Browser|null=cdp?await chromium.connectOverCDP(cdp).catch(()=>{throw new Error("browser_bridge_cdp_connection_failed");}):null;
+const browser:Browser|null=cdp?await chromium.connectOverCDP(cdp,schoolBrowserConnectionOptions(provider!)).catch(()=>{throw new Error("browser_bridge_cdp_connection_failed");}):null;
 const context=browser?browser.contexts()[0]:await chromium.launchPersistentContext(path.resolve(profile!),{channel:"msedge",headless:false,acceptDownloads:false,args:["--disable-features=PasswordLeakDetection"]});
 if(!context){await browser?.close();throw new Error("browser_bridge_cdp_context_not_found");}
 const pages=context.pages(),existing=cdp?pages.find(candidate=>{try{const url=new URL(candidate.url());return provider?.startsWith("teams")?['teams.microsoft.com','teams.cloud.microsoft'].includes(url.hostname):url.hostname.endsWith(".inschool.visma.no");}catch{return false;}}):null;

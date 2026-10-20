@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { missingSchoolTabError } from "./school-session.js";
+import { missingSchoolTabError, schoolBrowserConnectionOptions } from "./school-session.js";
+
+describe("school browser connection defaults", () => {
+  it.each(["teams-assignments", "teams-channels", "teams-chats", "inschool", "inschool-attendance", "inschool-assessments"])("does not replace the active download directory while %s reads", provider => {
+    expect(schoolBrowserConnectionOptions(provider)).toEqual({ noDefaults: true });
+  });
+  it.each(["teams-powerpoints", "teams-assignment-files"])("enables controlled downloads for %s", provider => {
+    expect(schoolBrowserConnectionOptions(provider)).toEqual({ noDefaults: false });
+  });
+});
 
 describe("missing school session", () => {
   it.each(["inschool", "inschool-attendance", "inschool-assessments"])("reports Feide sign-in for %s", provider => {

@@ -27,7 +27,7 @@ const provider = args.get("provider");
 if (provider !== "teams" && provider !== "inschool") throw new Error("provider_required");
 const expectedOrigin = provider === "inschool" ? new URL(args.get("origin") ?? "").origin : null;
 if (provider === "inschool" && (!expectedOrigin || !new URL(expectedOrigin).hostname.endsWith(".inschool.visma.no"))) throw new Error("inschool_origin_invalid");
-const browser = await chromium.connectOverCDP(endpoint.toString()).catch(() => { throw new Error("cdp_connection_failed"); });
+const browser = await chromium.connectOverCDP(endpoint.toString(), { noDefaults: args.get("teams-post-download-probe") !== "true" }).catch(() => { throw new Error("cdp_connection_failed"); });
 try {
   let page = browser.contexts().flatMap(context => context.pages()).find(candidate => {
     try { const origin = new URL(candidate.url()).origin; return provider === "teams" ? ["https://teams.microsoft.com", "https://teams.cloud.microsoft"].includes(origin) : origin === expectedOrigin; } catch { return false; }

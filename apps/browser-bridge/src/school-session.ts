@@ -1,3 +1,7 @@
+export function schoolBrowserConnectionOptions(provider: string): { noDefaults: boolean } {
+  return { noDefaults: provider !== "teams-powerpoints" && provider !== "teams-assignment-files" };
+}
+
 export function missingSchoolTabError(provider: string, urls: string[]): string {
   const origins = urls.flatMap(value => { try { return [new URL(value).origin]; } catch { return []; } });
   if (provider.startsWith("inschool") && origins.includes("https://idp.feide.no")) return "inschool_login_required";
