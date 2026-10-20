@@ -1,7 +1,7 @@
-import { createHash } from "node:crypto";
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
+import { mkdir, readFile, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { Frame, Page } from "playwright-core";
+import type { Download, Frame, Page } from "playwright-core";
 import { openTeamsNavigation } from "./teams-navigation.js";
 
 type Entry = { name: string; rowIndex: number; folder: boolean };
@@ -79,6 +79,34 @@ export async function retryInvalidDownload<T>(download: () => Promise<T>, wait: 
 
 export function skippableSchoolFileError(error: unknown): string | null {
   return error instanceof Error && retryableDownloadErrors.has(error.message) ? error.message : null;
+}
+
+export async function readSchoolDownload(download: Pick<Download, "saveAs" | "suggestedFilename" | "cancel">, stagingRoot: string, fileName: string, bytesSoFar: number): Promise<Buffer> {
+  const filePath = path.join(stagingRoot, "files", `${randomUUID()}.download`);
+  try {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const saving = download.saveAs(filePath);
+    await Promise.race([saving, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("download_timeout")), 60_000); })])
+      .catch(async error => {
+        if (error instanceof Error && error.message === "download_timeout") {
+          await download.cancel().catch(() => {});
+          await saving.catch(() => {});
+          throw new Error("teams_powerpoint_download_path_timeout");
+        }
+        throw new Error("teams_powerpoint_download_path_failed");
+      })
+      .finally(() => { if (timer) clearTimeout(timer); });
+    const metadata = await stat(filePath).catch(() => { throw new Error("teams_powerpoint_download_missing"); });
+    if (!metadata.isFile() || metadata.size < 1) throw new Error("teams_powerpoint_download_empty");
+    if (!download.suggestedFilename().toLowerCase().endsWith(fileName.slice(fileName.lastIndexOf(".")).toLowerCase())) throw new Error("teams_school_file_download_was_bundle");
+    if (metadata.size > schoolFileByteLimit(fileName)) throw new Error(`teams_powerpoint_file_limit_exceeded:${metadata.size}`);
+    if (bytesSoFar + metadata.size > maxBatchBytes) throw new Error(`teams_powerpoint_batch_limit_exceeded:${bytesSoFar + metadata.size}`);
+    const contents = await readFile(filePath).catch(() => { throw new Error("teams_powerpoint_download_invalid"); });
+    validateSchoolOriginal(fileName, contents);
+    return contents;
+  } finally {
+    await unlink(filePath).catch(error => { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; });
+  }
 }
 
 async function visibleEntries(frame: Frame): Promise<{ entries: Entry[]; totalRows: number | null }> {
@@ -189,16 +217,7 @@ async function collectPostFiles(probe: Page, className: string, channelName: str
       const action = probe.getByRole("menuitem", { name: "Download", exact: true });
       if (await action.count() !== 1) throw new Error("teams_post_download_action_missing");
       const download = await Promise.all([probe.waitForEvent("download", { timeout: 30_000 }), action.click({ timeout: 10_000, noWaitAfter: true })]).then(([item]) => item);
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      const filePath = await Promise.race([download.path(), new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("teams_post_download_timeout")), 60_000); })]).finally(() => { if (timer) clearTimeout(timer); });
-      const metadata = await stat(filePath);
-      if (!metadata.isFile() || metadata.size < 1) throw new Error("teams_powerpoint_download_invalid");
-      if (!download.suggestedFilename().toLowerCase().endsWith(fileName.slice(fileName.lastIndexOf(".")).toLowerCase())) throw new Error("teams_school_file_download_was_bundle");
-      if (metadata.size > schoolFileByteLimit(fileName)) throw new Error(`teams_powerpoint_file_limit_exceeded:${metadata.size}`);
-      if (bytesSoFar + bytes + metadata.size > maxBatchBytes) throw new Error(`teams_powerpoint_batch_limit_exceeded:${bytesSoFar + bytes + metadata.size}`);
-      const contents = await readFile(filePath);
-      validateSchoolOriginal(fileName, contents);
-      return contents;
+      return readSchoolDownload(download, stagingRoot, fileName, bytesSoFar + bytes);
     });
     const sha256 = createHash("sha256").update(downloaded).digest("hex");
     const stagedPath = path.join(stagingRoot, "files", sha256);
@@ -348,16 +367,7 @@ export async function collectTeamsPowerpoints(source: Page, stagingRoot: string,
               throw error;
             });
             phase = "validate";
-            let timer: ReturnType<typeof setTimeout> | undefined;
-            const filePath = await Promise.race([download.path(), new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("download_timeout")), 60_000); })]).catch(error => { throw new Error(error instanceof Error && error.message === "download_timeout" ? "teams_powerpoint_download_path_timeout" : "teams_powerpoint_download_path_failed"); }).finally(() => { if (timer) clearTimeout(timer); });
-            const metadata = await stat(filePath).catch(() => { throw new Error("teams_powerpoint_download_missing"); });
-            if (!metadata.isFile() || metadata.size < 1) throw new Error("teams_powerpoint_download_empty");
-            if (!download.suggestedFilename().toLowerCase().endsWith(entry.name.slice(entry.name.lastIndexOf(".")).toLowerCase())) throw new Error("teams_school_file_download_was_bundle");
-            if (metadata.size > schoolFileByteLimit(entry.name)) throw new Error(`teams_powerpoint_file_limit_exceeded:${metadata.size}`);
-            if (totalBytes + metadata.size > maxBatchBytes) throw new Error(`teams_powerpoint_batch_limit_exceeded:${totalBytes + metadata.size}`);
-            const downloadedBytes = await readFile(filePath).catch(() => { throw new Error("teams_powerpoint_download_invalid"); });
-            validateSchoolOriginal(entry.name, downloadedBytes);
-            return downloadedBytes;
+            return readSchoolDownload(download, stagingRoot, entry.name, totalBytes);
           }); } catch (error) {
             const reason = skippableSchoolFileError(error);
             if (!reason || skippedFiles.length >= 5) throw error;

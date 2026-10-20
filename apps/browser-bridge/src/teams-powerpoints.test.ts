@@ -1,5 +1,8 @@
+import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { assignmentSchoolFileRelativePath, postSchoolFileRelativePath, retryInvalidDownload, safeSegment, schoolFileByteLimit, skippableSchoolFileError, validateSchoolOriginal } from "./teams-powerpoints.js";
+import { assignmentSchoolFileRelativePath, postSchoolFileRelativePath, readSchoolDownload, retryInvalidDownload, safeSegment, schoolFileByteLimit, skippableSchoolFileError, validateSchoolOriginal } from "./teams-powerpoints.js";
 
 describe("Teams PowerPoint path segments", () => {
   it("removes path separators without losing Norwegian names", () => {
@@ -14,6 +17,34 @@ describe("Teams PowerPoint path segments", () => {
 });
 
 describe("Teams PowerPoint download retry", () => {
+  it("saves a download into controlled staging and removes the transient copy", async () => {
+    const stagingRoot = await mkdtemp(path.join(tmpdir(), "sorta-teams-download-"));
+    try {
+      await mkdir(path.join(stagingRoot, "files"));
+      const contents = Buffer.from("%PDF school handout");
+      const actual = await readSchoolDownload({
+        saveAs: async target => { await writeFile(target, contents); },
+        suggestedFilename: () => "handout.pdf",
+        cancel: async () => {},
+      }, stagingRoot, "handout.pdf", 0);
+      expect(actual).toEqual(contents);
+      expect(await readdir(path.join(stagingRoot, "files"))).toEqual([]);
+    } finally { await rm(stagingRoot, { recursive: true, force: true }); }
+  });
+
+  it("normalizes a failed controlled download and leaves no transient copy", async () => {
+    const stagingRoot = await mkdtemp(path.join(tmpdir(), "sorta-teams-download-"));
+    try {
+      await mkdir(path.join(stagingRoot, "files"));
+      await expect(readSchoolDownload({
+        saveAs: async () => { throw new Error("browser download failed"); },
+        suggestedFilename: () => "handout.pdf",
+        cancel: async () => {},
+      }, stagingRoot, "handout.pdf", 0)).rejects.toThrow("teams_powerpoint_download_path_failed");
+      expect(await readdir(path.join(stagingRoot, "files"))).toEqual([]);
+    } finally { await rm(stagingRoot, { recursive: true, force: true }); }
+  });
+
   it("retries one invalid archive and returns the valid download", async () => {
     let attempts = 0;
     const result = await retryInvalidDownload(async () => {
