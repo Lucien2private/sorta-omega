@@ -71,7 +71,7 @@ try {
         throw 'The Teams assignment capture is smaller than the last live import; no missing assignments were reconciled. Inspect Teams source coverage before accepting a lower count.'
       }
     }
-    $snapshot = Get-Content -LiteralPath $artifact -Raw | ConvertFrom-Json
+    $snapshot = Get-Content -LiteralPath $artifact -Raw -Encoding UTF8 | ConvertFrom-Json
     if ($snapshot.version -ne $bridgeReport.format -or @($snapshot.records).Count -ne [int]$bridgeReport.itemCount -or [int]$snapshot.coverage.visibleCardCount -ne [int]$bridgeReport.itemCount -or [int]$snapshot.coverage.capturedDetailCount -ne [int]$bridgeReport.itemCount) { throw 'The Teams snapshot did not account for every visible assignment card.' }
     & docker cp $artifact "${AppContainer}:$containerArtifact"
     if ($LASTEXITCODE -ne 0) { throw 'The Teams snapshot could not be transferred to the app container.' }
