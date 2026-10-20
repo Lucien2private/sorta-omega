@@ -3,7 +3,7 @@ function ConvertFrom-SchoolLegacyPath {
   if ($RelativePath -notmatch '^Teams/[^/]+/Assignments/[a-f0-9]{24}/[^/]+\.(pptx|pdf|docx|xlsx)$') { return $null }
   try {
     $oem = [Text.Encoding]::GetEncoding(850, [Text.EncoderFallback]::ExceptionFallback, [Text.DecoderFallback]::ExceptionFallback)
-    $corrected = [Text.UTF8Encoding]::new($false, $true).GetString($oem.GetBytes($RelativePath))
+    $corrected = [Text.UTF8Encoding]::new($false, $true).GetString($oem.GetBytes($RelativePath)).Normalize([Text.NormalizationForm]::FormC)
   } catch { return $null }
   if ($corrected -ceq $RelativePath -or $corrected -notmatch '^Teams/[^/]+/Assignments/[a-f0-9]{24}/[^/]+\.(pptx|pdf|docx|xlsx)$') { return $null }
   $knownCourses = @($CourseNames | ForEach-Object {
