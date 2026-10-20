@@ -41,6 +41,13 @@ function Ensure-SchoolTabs {
   $portText = Get-ProfilePort
   $tabs = Invoke-RestMethod -Uri "http://127.0.0.1:$portText/json/list" -TimeoutSec 3
   $pages = @($tabs | Where-Object { $_.type -eq 'page' })
+  $signInInProgress = $pages | Where-Object {
+    try { ([Uri]$_.url).Scheme -eq 'https' -and ([Uri]$_.url).Host -in @('idp.feide.no', 'login.microsoftonline.com') } catch { $false }
+  }
+  if ($signInInProgress) {
+    Write-Output 'School sign-in is in progress; existing authentication tabs retained.'
+    return
+  }
   $schoolOrigins = @(
     @{ Url = 'https://teams.microsoft.com/'; HostPattern = '^(teams\.microsoft\.com|teams\.cloud\.microsoft)$' },
     @{ Url = $origin.GetLeftPart([UriPartial]::Authority); HostPattern = '^' + [regex]::Escape($origin.Host) + '$' }
