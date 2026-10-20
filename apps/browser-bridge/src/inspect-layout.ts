@@ -33,6 +33,21 @@ try {
     try { const origin = new URL(candidate.url()).origin; return provider === "teams" ? ["https://teams.microsoft.com", "https://teams.cloud.microsoft"].includes(origin) : origin === expectedOrigin; } catch { return false; }
   });
   let authProbed = false;
+  if (provider === "inschool" && args.get("probe-inschool-reconnect") === "true") {
+    if (!page || new URL(page.url()).origin !== expectedOrigin) throw new Error("inschool_reconnect_tab_missing");
+    const login = page.getByRole("button", { name: "Logg inn med Feide", exact: true });
+    if (await login.count() !== 1) throw new Error("inschool_reconnect_control_not_unique");
+    await login.click({ timeout: 10_000 });
+    await page.waitForTimeout(5_000);
+    const destination = new URL(page.url());
+    console.log(JSON.stringify({ provider, reconnect: {
+      origin: destination.origin,
+      timetableVisible: await page.locator(".userTimetable_currentWeek").count() === 1,
+      passwordFields: await page.locator('input[type="password"]').count(),
+      headingLabels: await page.locator("h1, h2").allTextContents(),
+    } }));
+    authProbed = true;
+  }
   if (provider === "teams" && args.has("probe-navigation")) {
     const section = args.get("probe-navigation");
     if (!page || !["assignments", "teams", "chat"].includes(section ?? "")) throw new Error("teams_probe_navigation_invalid");
