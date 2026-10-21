@@ -31,6 +31,14 @@ describe("source-based note sorting", () => {
     expect(subjectName("Entreprenørskap og bedriftsutvikling 1 2026-27 - VGMAI")).toBe("Entreprenørskap og bedriftsutvikling 1");
     expect(subjectName("Matematikk 2P 26/27 med Benedicte")).toBe("Matematikk 2P");
     expect(subjectName("Økonomistyring")).toBe("Økonomistyring");
+    expect(subjectName("Økonomistyring 2026 27 - VGMAI")).toBe("Økonomistyring");
+  });
+  it("normalizes only observed legacy OEM label damage without editing originals", () => {
+    expect(subjectName("├ÿkonomistyring 2026 27 - VGMAI")).toBe("Økonomistyring");
+    expect(subjectName("Entrepren├╕rskap og bedriftsutvikling 1 2026-27 - VGMAI")).toBe("Entreprenørskap og bedriftsutvikling 1");
+  });
+  it("does not include the General channel in a file's class name", () => {
+    expect(source("Imported from teams: Teams/History - VGMAI/General/Posts/file.pdf", "file", "Teams/History - VGMAI/General/Posts/file.pdf").subject).toBe("History");
   });
 });
 

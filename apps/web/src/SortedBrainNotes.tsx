@@ -31,15 +31,15 @@ export function SortedBrainNotes({ notes, loading, incomplete, renderNote }: {
     <label className="brain-find">Find a note or file
       <input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Subject, title or words in the note"/>
     </label>
-    <p className="sorting-explanation">Class groups use recorded source information. AI suggestions stay separate from your original notes.</p>
-    {notes.some(note => note.body.trim() && !note.classificationLocked && note.classifiedRevision !== note.revision) && <p className="sorting-explanation">AI classification is pending for some notes. Class groups work without it.</p>}
+    <p className="sorting-explanation">Grouped from source information. Original notes and files stay unchanged.</p>
+    {notes.some(note => note.body.trim() && !note.classificationLocked && note.classifiedRevision !== note.revision) && <p className="sorting-explanation">AI classification pending. Class groups work now.</p>}
     {loading && <p role="status">Loading all saved notes…</p>}
     {incomplete && <p className="pending-banner" role="status">Could not load all notes. Only the records loaded so far are shown. Reload to try again.</p>}
     {!loading && !incomplete && groups.length === 0 && <p role="status">{search.trim() ? "No notes match. Try another word." : "No saved notes yet. Capture a thought or drop files in the Inbox."}</p>}
     <div className="brain-class-groups">{groups.map(group => {
       const originals = groupImportedOriginals(group.notes.map(note => isAutomaticSourceNote(note) ? note : { ...note, originalSha256: null }));
       return <details className="brain-class-group" key={group.name} open={search.trim() ? true : undefined}>
-        <summary><span>{group.name}</span><span className="brain-group-count">{originals.length} {originals.length === 1 ? "item" : "items"}</span></summary>
+        <summary><span>{group.name}</span>{" "}<span className="brain-group-count">{originals.length} {originals.length === 1 ? "item" : "items"}</span></summary>
         <div className="brain-group-content">
           <div className="notes-grid">{originals.map(original => {
             const primary = original.find(note => !importedSourceLocation(note).includes("/Posts/")) ?? original[0];

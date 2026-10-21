@@ -12,7 +12,8 @@ export type AutomaticOrganization = {
 };
 
 export function subjectName(value: string): string {
-  return value.replace(/\s+-\s+VGMAI\s*$/i, "").replace(/\s+(?:20)?\d{2}(?:[/_–-]|\s+)(?:20)?\d{2}\b.*$/u, "").replace(/\s+20\d{2}$/, "").trim().slice(0, 240);
+  const label = value.replaceAll("├ÿ", "Ø").replaceAll("├╕", "ø");
+  return label.replace(/\s+-\s+VGMAI\s*$/i, "").replace(/\s+(?:20)?\d{2}(?:[/_–-]|\s+)(?:20)?\d{2}\b.*$/u, "").replace(/\s+20\d{2}$/, "").trim().slice(0, 240);
 }
 
 function normalized(value: string): string {
@@ -28,7 +29,7 @@ export function sourceOrganization(note: { body: string; sourceKind: string | nu
     if (classLine) { subject = subjectName(classLine.slice(7)); evidenceQuote = classLine; }
   } else if (note.relativePath?.startsWith("Teams/")) {
     // The import manifest supplies the path, not text inside the uploaded file.
-    const classPath = note.relativePath.match(/^Teams\/(.+?)\/(?:Shared|Posts|Assignments|Files|Filer|Class Materials|Kursmateriell)(?:\/|$)/i)?.[1] ?? note.relativePath.split("/")[1] ?? "";
+    const classPath = note.relativePath.match(/^Teams\/(.+?)\/(?:Shared|Posts|Assignments|Files|Filer|Class Materials|Kursmateriell|General|Generelt)(?:\/|$)/i)?.[1] ?? note.relativePath.split("/")[1] ?? "";
     subject = subjectName(classPath);
     evidenceQuote = note.body.split("\n", 1)[0];
   } else if (note.sourceKind === "capture" || note.sourceKind === null) {
@@ -67,7 +68,7 @@ export async function reconcileNoteSortingInTransaction(client: PoolClient, vaul
     // Serialize backfills with note edits and existing capture/job creation transactions.
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`note-sorting:${vaultId}`]);
     const subjects = await sortingSubjects(client, vaultId);
-    const contextHash = createHash("sha256").update(JSON.stringify(subjects)).digest("hex");
+    const contextHash = createHash("sha256").update(JSON.stringify({ version: 2, subjects })).digest("hex");
     const result = await client.query(
       `SELECT n.*, s.kind AS source_kind, p.relative_path FROM notes n
        LEFT JOIN sources s ON s.id=n.source_id AND s.vault_id=n.vault_id
