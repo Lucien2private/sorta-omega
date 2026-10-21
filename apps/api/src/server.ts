@@ -353,6 +353,7 @@ import { explicitCapturedTaskTitle } from "./captured-task.js";
 import { groundedReturnCandidates } from "./commitment-candidates.js";
 import { prepStatusTransition } from "./prep-item.js";
 import { applyClassificationResult, classificationUndoConflict, type NoteClassification } from "./classification.js";
+import { acceptedAiOrganization, reconcileNoteSorting, sortingSubjects, type AutomaticOrganization } from "./note-sorting.js";
 import { compileNoteFilter, filterLabelIds } from "./note-filter.js";
 import { decodeActivityCursor, encodeActivityCursor } from "./activity.js";
 import { summarizeAttendance, type AttendanceAggregation } from "./attendance-summary.js";
@@ -530,6 +531,7 @@ const mapNote = (row: Record<string, any>) => noteSchema.parse({
   status: row.status, sourceId: row.source_id, originalSha256: row.original_sha256 ?? null, revision: row.revision,
   classification: row.classification, classificationLocked: row.classification_locked, suggestedTitle: row.suggested_title,
   classifiedRevision: row.classified_revision, organizationRevision: row.organization_revision,
+  automaticOrganization: row.automatic_organization?.sourceRevision === row.revision ? row.automatic_organization : null,
   createdAt: iso(row.created_at), updatedAt: iso(row.updated_at)
 });
 const mapRevision = (row: Record<string, any>) => noteRevisionSchema.parse({
@@ -1301,6 +1303,7 @@ app.post("/api/v1/restore-plans/:restorePlanId/apply",async(request,reply)=>{con
 app.get("/api/v1/vaults/:vaultId/notes", async (request, reply) => {
   const { vaultId } = request.params as { vaultId: string };
   idSchema.parse(vaultId);
+  await reconcileNoteSorting(vaultId);
   const rawCursor = (request.query as { cursor?: unknown }).cursor;
   if (rawCursor !== undefined && typeof rawCursor !== "string") return reply.code(400).send({ error: "invalid_cursor" });
   let cursor: ReturnType<typeof decodeNotesCursor> | null = null;
@@ -1988,13 +1991,13 @@ app.post("/api/v1/vaults/:vaultId/ai-operations/:operationId/undo", async (reque
       input.expectedCurrentRevision
     );
     if (conflict) return conflict;
-    const inverse = item.inverse as { classification?: NoteClassification | null; suggestedTitle?: string | null; classifiedRevision?: number | null };
+    const inverse = item.inverse as { classification?: NoteClassification | null; suggestedTitle?: string | null; classifiedRevision?: number | null; automaticOrganization?: AutomaticOrganization | null };
     const removed = await client.query("DELETE FROM note_labels WHERE note_id = $1 AND source_operation_id = $2 AND locked = false RETURNING label_id", [item.note_id, operationId]);
     await client.query("UPDATE note_commitment_candidates SET state='dismissed',updated_at=now() WHERE vault_id=$1 AND source_operation_id=$2 AND state='proposed'",[vaultId,operationId]);
     const updated = await client.query(
-      `UPDATE notes SET classification = $2, suggested_title = $3, classified_revision = $4,
+      `UPDATE notes SET classification = $2, suggested_title = $3, classified_revision = $4, automatic_organization = CASE WHEN $5 THEN $6::jsonb ELSE automatic_organization END,
        organization_revision = organization_revision + 1, updated_at = now() WHERE id = $1 RETURNING organization_revision`,
-      [item.note_id, inverse.classification ?? null, inverse.suggestedTitle ?? null, inverse.classifiedRevision ?? null]
+      [item.note_id, inverse.classification ?? null, inverse.suggestedTitle ?? null, inverse.classifiedRevision ?? null, Object.hasOwn(inverse, "automaticOrganization"), JSON.stringify(inverse.automaticOrganization ?? null)]
     );
     const undone = await client.query("UPDATE ai_operations SET undone_at = now() WHERE id = $1 RETURNING undone_at", [operationId]);
     return { noteId: item.note_id, classification: inverse.classification ?? null, removed: removed.rowCount ?? 0, organizationRevision: updated.rows[0].organization_revision, undoneAt: undone.rows[0].undone_at };
@@ -4942,7 +4945,7 @@ app.get("/api/v1/worker/jobs/:jobId/input", async (request, reply) => {
       [job.vault_id, payload.sourceId, payload.noteId, payload.revision]
     );
     if (!source.rows[0]) return reply.code(409).send({ error: "job_input_stale" });
-    payload = { ...payload, source: { contentHash: createHash("sha256").update(source.rows[0].body).digest("hex"), text: source.rows[0].body } };
+    payload = { ...payload, subjects: payload.subjects ?? await sortingSubjects(pool, job.vault_id), source: { contentHash: createHash("sha256").update(source.rows[0].body).digest("hex"), text: source.rows[0].body.slice(0, 200000) } };
   }
   if (job.kind === "study_plan_generate") {
     const plan = await query("SELECT status FROM study_plans WHERE id=$1 AND vault_id=$2", [payload.studyPlanId, job.vault_id]);
@@ -5170,7 +5173,7 @@ app.post("/api/v1/worker/jobs/:jobId/complete", async (request, reply) => {
     let persistedResult: unknown = input.result;
     if (input.result.type === "note_processing") {
       if (input.result.noteId !== job.input.noteId || input.result.processedRevision !== job.input.revision) return "result_revision_mismatch" as const;
-      const current = await client.query<{ revision: number; body: string; classification_locked: boolean; classification: NoteClassification | null; suggested_title: string | null; classified_revision: number | null; organization_revision: number }>("SELECT revision, body, classification_locked, classification, suggested_title, classified_revision, organization_revision FROM notes WHERE id = $1 AND vault_id = $2 AND trashed_at IS NULL FOR UPDATE", [job.input.noteId, job.vault_id]);
+      const current = await client.query<{ revision: number; body: string; classification_locked: boolean; classification: NoteClassification | null; suggested_title: string | null; classified_revision: number | null; organization_revision: number; automatic_organization: AutomaticOrganization | null }>("SELECT revision, body, classification_locked, classification, suggested_title, classified_revision, organization_revision, automatic_organization FROM notes WHERE id = $1 AND vault_id = $2 AND trashed_at IS NULL FOR UPDATE", [job.input.noteId, job.vault_id]);
       if (!current.rows[0] || current.rows[0].revision !== job.input.revision) {
         const superseded = await client.query(
           `UPDATE jobs SET status = 'superseded', stage = 'stale_input', progress = NULL, result = NULL,
@@ -5189,16 +5192,19 @@ app.post("/api/v1/worker/jobs/:jobId/complete", async (request, reply) => {
         [job.input.noteId, nextClassification.classification, nextClassification.suggestedTitle, nextClassification.classifiedRevision]
       );
       const validCandidates=groundedReturnCandidates(current.rows[0].body,input.result.commitmentCandidates);
-      persistedResult={...input.result,commitmentCandidates:validCandidates};
+      const organization = applied ? acceptedAiOrganization(input.result.organization, current.rows[0].body, await sortingSubjects(client, job.vault_id), job.input.revision) : null;
+      const sourceSorted = current.rows[0].automatic_organization?.origin === "source" && current.rows[0].automatic_organization.sourceRevision === job.input.revision;
+      if (organization && !sourceSorted) await client.query("UPDATE notes SET automatic_organization=$2::jsonb,organization_revision=organization_revision+1 WHERE id=$1", [job.input.noteId, JSON.stringify({ ...organization, contextHash: current.rows[0].automatic_organization?.contextHash })]);
+      persistedResult={...input.result,commitmentCandidates:validCandidates,organization:organization && !sourceSorted ? input.result.organization : null};
       const model = await client.query<{ digest: string }>(
         `SELECT profile->>'digest' AS digest FROM workers w, jsonb_array_elements(w.installed_profiles) profile
          WHERE w.id = $1 AND profile->>'id' = 'local-qwen-general'`, [worker.id]
       );
       const operation = await client.query(
         `INSERT INTO ai_operations(vault_id, note_id, job_id, kind, source_revision, model_profile_id, model_digest, prompt_version, result, inverse, applied)
-         VALUES ($1,$2,$3,'classification',$4,'local-qwen-general',$5,'note-classification-v1',$6::jsonb,$7::jsonb,$8)
+         VALUES ($1,$2,$3,'classification',$4,'local-qwen-general',$5,'note-classification-sort-v2',$6::jsonb,$7::jsonb,$8)
          ON CONFLICT(job_id, kind) DO UPDATE SET result = excluded.result RETURNING id`,
-        [job.vault_id, job.input.noteId, jobId, job.input.revision, model.rows[0]?.digest ?? null, JSON.stringify(persistedResult), JSON.stringify({ classification: current.rows[0].classification, suggestedTitle: current.rows[0].suggested_title, classifiedRevision: current.rows[0].classified_revision, organizationRevision: current.rows[0].organization_revision }), applied]
+        [job.vault_id, job.input.noteId, jobId, job.input.revision, model.rows[0]?.digest ?? null, JSON.stringify(persistedResult), JSON.stringify({ classification: current.rows[0].classification, suggestedTitle: current.rows[0].suggested_title, classifiedRevision: current.rows[0].classified_revision, automaticOrganization: current.rows[0].automatic_organization, organizationRevision: current.rows[0].organization_revision }), applied]
       );
       for(const candidate of validCandidates)await client.query(
         `INSERT INTO note_commitment_candidates(vault_id,note_id,note_revision,evidence_quote,person_name,object_label,kind,condition_kind,source_operation_id)
@@ -5897,10 +5903,23 @@ if (config.NODE_ENV === "production") {
   });
 }
 
-const close = async () => { await app.close(); await pool.end(); };
+let noteSortingRunning = false;
+async function sortSavedNotes() {
+  if (noteSortingRunning) return;
+  noteSortingRunning = true;
+  try {
+    const vaults = await query<{ id: string }>("SELECT id FROM vaults");
+    for (const vault of vaults.rows) await reconcileNoteSorting(vault.id);
+  } catch (error) { app.log.error({ error }, "Automatic note sorting will retry on the next pass"); }
+  finally { noteSortingRunning = false; }
+}
+const noteSortingTimer = setInterval(() => { void sortSavedNotes(); }, 30_000);
+noteSortingTimer.unref();
+const close = async () => { clearInterval(noteSortingTimer); await app.close(); await pool.end(); };
 registerSchoolWeatherRoutes(app);
 process.on("SIGINT", close);
 process.on("SIGTERM", close);
 
 await app.listen({ host: config.API_HOST, port: config.API_PORT });
+void sortSavedNotes();
 app.log.info({ defaultVault: DEFAULT_VAULT }, "Sorta Omega API ready");

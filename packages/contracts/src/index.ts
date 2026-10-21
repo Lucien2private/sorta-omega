@@ -90,6 +90,15 @@ export const blobSummarySchema = z.object({
 export const syncRecordTypeSchema = z.enum(["note","task","reminder","notification","calendar","calendar_event","event_reminder_plan","calendar_entity","commitment","school_subject","school_course","school_assignment","school_lesson","school_assessment","attendance_record","performance_grade","performance_target","study_session","knowledge_gap","flashcard_deck","flashcard","scheduler_preferences","momentum_preferences","project","idea","goal","memory","integration_connection","insight","personal_data_item","interest","provider_calendar_action"]);
 
 export const noteStatusSchema = z.enum(["saved", "processing", "ready", "failed"]);
+export const automaticNoteOrganizationSchema = z.object({
+  subject: z.string().min(1).max(240).nullable(), topic: z.string().min(1).max(80).nullable(),
+  origin: z.enum(["source", "ai", "unassigned"]), evidenceQuote: z.string().max(1000).nullable(),
+  sourceRevision: z.number().int().positive()
+});
+export const proposedNoteOrganizationSchema = z.object({
+  subject: z.string().min(1).max(240).nullable(), topic: z.string().min(1).max(80).nullable(),
+  evidenceQuote: z.string().min(1).max(1000), confidence: z.number().min(0).max(1)
+}).strict();
 export const noteSchema = z.object({
   id: idSchema,
   vaultId: vaultIdSchema,
@@ -101,6 +110,7 @@ export const noteSchema = z.object({
   suggestedTitle: z.string().nullable(),
   classifiedRevision: z.number().int().positive().nullable(),
   organizationRevision: z.number().int().positive(),
+  automaticOrganization: automaticNoteOrganizationSchema.nullable().optional(),
   sourceId: idSchema.nullable(),
   originalSha256: sha256Schema.nullable().optional(),
   revision: z.number().int().positive(),
@@ -617,7 +627,7 @@ export const jobHandleSchema = z.object({
 export const chatMessageAcceptedSchema = z.object({ userMessage: chatMessageSchema, assistantMessage: chatMessageSchema, job: jobHandleSchema });
 export const typedJobResultSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("search"), search: searchResultSchema }),
-  z.object({ type: z.literal("note_processing"), noteId: idSchema, processedRevision: z.number().int().positive(), classification: z.enum(["note", "task", "event", "idea", "reference", "unknown"]), suggestedTitle: z.string().max(240).nullable(), commitmentCandidates: z.array(commitmentCandidateSchema).max(5).default([]) }),
+  z.object({ type: z.literal("note_processing"), noteId: idSchema, processedRevision: z.number().int().positive(), classification: z.enum(["note", "task", "event", "idea", "reference", "unknown"]), suggestedTitle: z.string().max(240).nullable(), commitmentCandidates: z.array(commitmentCandidateSchema).max(5).default([]), organization: proposedNoteOrganizationSchema.nullable().optional() }),
   z.object({ type: z.literal("ai_setup_test"), completion: z.boolean(), structuredOutput: z.boolean(), embeddings: z.boolean() }),
   z.object({ type: z.literal("index_rebuild"), indexedRevisions: z.number().int().nonnegative() }),
   z.object({ type: z.literal("answer"), chatId: idSchema, messageId: idSchema, answer: z.string().min(1).max(20000), citations: z.array(citationSchema), actionReceipt:z.object({calendarEventId:idSchema,reminderId:idSchema,remindAt:z.string().datetime()}).strict().nullable().optional() }),
@@ -745,7 +755,7 @@ export const workerJobInputSchema = z.object({
   kind: jobKindSchema,
   inputHash: z.string().length(64),
   payload: z.discriminatedUnion("type", [
-    z.object({ type: z.literal("note_processing"), noteId: idSchema, sourceId: idSchema, revision: z.number().int().positive(), stages: z.array(z.literal("classify")), source: z.object({ contentHash: z.string().length(64), text: z.string().max(200000) }) }),
+    z.object({ type: z.literal("note_processing"), noteId: idSchema, sourceId: idSchema, revision: z.number().int().positive(), stages: z.array(z.literal("classify")), subjects: z.array(z.string().min(1).max(240)).max(100).default([]), source: z.object({ contentHash: z.string().length(64), text: z.string().max(200000) }) }),
     z.object({ type: z.literal("search"), query: z.string(), mode: z.enum(["hybrid", "semantic"]), scope: z.object({ kinds: z.array(searchKindSchema) }), limit: z.number().int().positive() }),
     z.object({ type: z.literal("ai_setup_test"), workerId: z.string(), modelProfileId: z.string() }),
     z.object({ type: z.literal("index_rebuild"), generationId: idSchema, modelProfileId: z.string(), chunkerVersion: z.string(), notes: z.array(z.object({ noteId: idSchema, sourceId: idSchema, revision: z.number().int().positive(), contentHash: z.string().length(64) })).max(5000) }),

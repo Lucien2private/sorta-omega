@@ -1,0 +1,20 @@
+.sorted-brain { min-width: 0; }
+.brain-find { display: grid; gap: 8px; max-width: 640px; margin: 24px 0 12px; color: var(--ink); font-weight: 600; }
+.brain-find input { width: 100%; min-width: 0; min-height: 44px; padding: 12px; border: 1px solid var(--muted); border-radius: 8px; color: var(--ink); background: var(--paper); }
+.sorting-explanation { margin: 0 0 24px; color: #4f5c68; line-height: 1.5; }
+.brain-class-groups { display: grid; gap: 12px; }
+.brain-class-group { min-width: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+.brain-class-group > summary { min-height: 56px; padding: 16px; color: var(--ink); cursor: pointer; overflow-wrap: anywhere; }
+.brain-class-group > summary > span:first-child { margin-right: 12px; font-weight: 700; }
+.brain-group-count { color: #4f5c68; font-size: .9rem; white-space: nowrap; }
+.brain-group-content { padding: 0 12px 12px; }
+.brain-group-content .notes-grid { margin: 0; grid-template-columns: minmax(0, 1fr); }
+.brain-group-content .note-card { min-width: 0; padding: 18px; box-shadow: none; border-radius: 8px; overflow-wrap: anywhere; }
+.brain-material { min-width: 0; }
+.brain-material-sources ul { list-style: none; padding: 0; display: grid; gap: 8px; }
+.brain-topic { margin: 12px 0 8px; font-weight: 600; color: #4f5c68; }
+.brain-source-path { overflow-wrap: anywhere; color: #4f5c68; }
+.sorted-brain summary:focus-visible, .sorted-brain input:focus-visible, .sorted-brain [role="button"]:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
+.sorted-brain summary:hover { background: #f4f6f4; }
+@media (min-width: 680px) { .brain-group-content { padding: 0 20px 20px; } .brain-group-content .notes-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1150px) { .brain-group-content .notes-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }

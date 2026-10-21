@@ -29,7 +29,8 @@ import { assessmentScopeParts } from "./assessment-scope";
 import { parseNorwegianDate, parseNorwegianDateTime } from "./norwegian-date-time";
 import { emptyNoteMessage, type AttachmentLoadState } from "./note-empty-state";
 import { passkeySignInMessage, type PasskeySignInStage } from "./passkey-signin";
-import { groupBrainNotes, groupImportedOriginals, importedSourceLocation, notePreviewContent } from "./brain-note-groups";
+import { notePreviewContent } from "./brain-note-groups";
+import { SortedBrainNotes } from "./SortedBrainNotes";
 import type { NoteCommitmentCandidate } from "@sorta/contracts";
 
 const RichDocumentEditor=lazy(()=>import("./ManagedNoteEditor"));
@@ -865,28 +866,10 @@ function noteCardPreview(note: Note): string {
 }
 
 function BrainNotes({ notes, loading, incomplete, onOpen, onCreate, busy }: { notes: Note[]; loading: boolean; incomplete: boolean; onOpen: (note: Note) => void; onCreate: () => void; busy: boolean }) {
-  const { personal, imported } = groupBrainNotes(notes);
-  const importedGroups = groupImportedOriginals(imported);
   return <>
-    <PageTitle eyebrow="Notes and sources" title="Brain" copy="Your notes first. Imported source records stay available below."/>
+    <PageTitle eyebrow="Notes and sources" title="Brain" copy="Notes and files, automatically grouped by class."/>
     <button className="primary" disabled={busy} onClick={onCreate}><Plus size={17}/> New note</button>
-    {loading && <p className="quiet-empty" role="status">Loading all saved notes…</p>}
-    {incomplete && <p className="pending-banner" role="status">Could not load all notes. Showing only the most recent records; older notes may be missing.</p>}
-    {personal.length > 0 ? <NoteList notes={personal} onOpen={onOpen}/> : !loading && !incomplete ? <p className="quiet-empty">No personal notes yet. Imported school posts and files are available below.</p> : null}
-    {imported.length > 0 && <details className="brain-source-group">
-      <summary>Imported materials <span>{importedGroups.length}{importedGroups.length !== imported.length ? ` · ${imported.length} source records` : ""}</span></summary>
-      <p>Identical PowerPoint, PDF, and Word originals appear once. Every source location and original record remains available.</p>
-      <div className="notes-grid">{importedGroups.map(group => {
-        const primary = group.find(note => !importedSourceLocation(note).includes("/Posts/")) ?? group[0];
-        return <div className="brain-material" key={primary.id}>
-          <NoteCard note={primary} onOpen={onOpen}/>
-          {group.length > 1 && <details className="brain-material-sources">
-            <summary>{group.length} source locations</summary>
-            <ul>{group.map(note => <li key={note.id}><button type="button" onClick={() => onOpen(note)}>{importedSourceLocation(note)}</button></li>)}</ul>
-          </details>}
-        </div>;
-      })}</div>
-    </details>}
+    <SortedBrainNotes notes={notes} loading={loading} incomplete={incomplete} renderNote={note => <NoteCard note={note} onOpen={onOpen}/>}/>
   </>;
 }
 
