@@ -31,6 +31,7 @@ import { emptyNoteMessage, type AttachmentLoadState } from "./note-empty-state";
 import { passkeySignInMessage, type PasskeySignInStage } from "./passkey-signin";
 import { notePreviewContent } from "./brain-note-groups";
 import { SortedBrainNotes } from "./SortedBrainNotes";
+import { watchBrainNotes } from "./brain-note-refresh";
 import type { NoteCommitmentCandidate } from "@sorta/contracts";
 
 const RichDocumentEditor=lazy(()=>import("./ManagedNoteEditor"));
@@ -279,11 +280,13 @@ function OmegaApp({ onLogout,onAuthenticationRequired }: { onLogout: () => Promi
   useEffect(() => { void pendingCaptures().then(items=>setPendingCount(items.length));void refresh();const reconnect=()=>void refresh();window.addEventListener("online",reconnect);return()=>window.removeEventListener("online",reconnect); }, []);
   useEffect(() => {
     if (view !== "brain" || selectedNote) return;
-    let cancelled = false;
     setBrainNotes(null);
     setBrainNotesError(false);
-    void api.allNotes().then(items => { if (!cancelled) setBrainNotes(items); }).catch(() => { if (!cancelled) setBrainNotesError(true); });
-    return () => { cancelled = true; };
+    return watchBrainNotes(() => api.allNotes(), items => { setBrainNotes(items); setBrainNotesError(false); }, error => {
+      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) { setBrainNotes([]); setNotes([]); }
+      if (error instanceof ApiError && error.status === 401) onAuthenticationRequired();
+      setBrainNotesError(true);
+    });
   }, [view, selectedNote?.id]);
   useEffect(()=>{
     if(!desktopBridge)return;

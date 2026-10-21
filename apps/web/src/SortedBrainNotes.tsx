@@ -34,7 +34,7 @@ export function SortedBrainNotes({ notes, loading, incomplete, renderNote }: {
     <p className="sorting-explanation">Grouped from source information. Original notes and files stay unchanged.</p>
     {notes.some(note => note.body.trim() && !note.classificationLocked && note.classifiedRevision !== note.revision) && <p className="sorting-explanation">AI classification pending. Class groups work now.</p>}
     {loading && <p role="status">Loading all saved notes…</p>}
-    {incomplete && <p className="pending-banner" role="status">Could not load all notes. Only the records loaded so far are shown. Reload to try again.</p>}
+    {incomplete && <p className="pending-banner" role="status">Could not load all notes. Showing the last loaded records; updates will retry automatically.</p>}
     {!loading && !incomplete && groups.length === 0 && <p role="status">{search.trim() ? "No notes match. Try another word." : "No saved notes yet. Capture a thought or drop files in the Inbox."}</p>}
     <div className="brain-class-groups">{groups.map(group => {
       const originals = groupImportedOriginals(group.notes.map(note => isAutomaticSourceNote(note) ? note : { ...note, originalSha256: null }));
