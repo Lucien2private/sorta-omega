@@ -286,7 +286,7 @@ function OmegaApp({ onLogout,onAuthenticationRequired }: { onLogout: () => Promi
       if (error instanceof ApiError && (error.status === 401 || error.status === 403)) { setBrainNotes([]); setNotes([]); }
       if (error instanceof ApiError && error.status === 401) onAuthenticationRequired();
       setBrainNotesError(true);
-    });
+    }, () => api.noteVersion().then(result => result.version));
   }, [view, selectedNote?.id]);
   useEffect(()=>{
     if(!desktopBridge)return;

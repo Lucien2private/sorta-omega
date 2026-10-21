@@ -35,4 +35,18 @@ describe("hands-off Brain refresh", () => {
     await vi.advanceTimersByTimeAsync(0); expect(failed).toHaveBeenCalledWith(error);
     await vi.advanceTimersByTimeAsync(30_000); expect(publish).toHaveBeenCalledWith([]); stop();
   });
+  it("checks only a small version marker until something actually changes", async () => {
+    vi.useFakeTimers(); vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
+    const load = vi.fn().mockResolvedValue([]), version = vi.fn().mockResolvedValue("1");
+    const stop = watchBrainNotes(load, vi.fn(), vi.fn(), version);
+    await vi.advanceTimersByTimeAsync(60_000); expect(version).toHaveBeenCalledTimes(3); expect(load).toHaveBeenCalledOnce();
+    version.mockResolvedValue("2"); await vi.advanceTimersByTimeAsync(30_000); expect(load).toHaveBeenCalledTimes(2); stop();
+  });
+  it("recovers after version lookup fails even if the next version is unchanged", async () => {
+    vi.useFakeTimers(); vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
+    const load = vi.fn().mockResolvedValue([]), failed = vi.fn();
+    const version = vi.fn().mockResolvedValueOnce("1").mockRejectedValueOnce(new Error("offline")).mockResolvedValue("1");
+    const stop = watchBrainNotes(load, vi.fn(), failed, version);
+    await vi.advanceTimersByTimeAsync(60_000); expect(load).toHaveBeenCalledTimes(2); expect(failed).toHaveBeenCalledOnce(); stop();
+  });
 });

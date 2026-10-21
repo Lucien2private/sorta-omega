@@ -1304,6 +1304,10 @@ app.get("/api/v1/vaults/:vaultId/notes", async (request, reply) => {
   const { vaultId } = request.params as { vaultId: string };
   idSchema.parse(vaultId);
   await reconcileNoteSorting(vaultId);
+  if ((request.query as { versionOnly?: string }).versionOnly === "true") {
+    const version = await query<{ version: string }>("SELECT coalesce(max(id),0)::text AS version FROM vault_change_events WHERE vault_id=$1 AND record_type='note'", [vaultId]);
+    return { version: version.rows[0].version };
+  }
   const rawCursor = (request.query as { cursor?: unknown }).cursor;
   if (rawCursor !== undefined && typeof rawCursor !== "string") return reply.code(400).send({ error: "invalid_cursor" });
   let cursor: ReturnType<typeof decodeNotesCursor> | null = null;

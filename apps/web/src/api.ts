@@ -71,6 +71,7 @@ export const api = {
   today: () => request<Today>(`${vaultPath}/today`),
   nextActions: (availableMinutes?: number) => request<NextActionSet>(`${vaultPath}/scheduler/recommendations${availableMinutes ? `?available_minutes=${availableMinutes}` : ""}`),
   notes: (cursor?: string) => request<{ items: Note[]; nextCursor: string | null }>(`${vaultPath}/notes${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`),
+  noteVersion: () => request<{ version: string }>(`${vaultPath}/notes?versionOnly=true`),
   allNotes: async () => {
     const items: Note[] = [];
     let cursor: string | null = null;
