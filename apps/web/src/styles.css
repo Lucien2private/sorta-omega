@@ -148,6 +148,12 @@ main { min-width: 0; }
   .chat-message { max-width: 100%; }.ask-composer > div { align-items: stretch; flex-direction: column; }.ask-composer span { width: 100%; }.ask-composer .primary { width: 100%; }.activity-list, .assignment-form, .assessment-form, .provider-action-form { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; } }
+
+@media (max-width: 620px) {
+  .topbar { gap: clamp(4px, 1.5vw, 10px); padding-inline: clamp(8px, 2vw, 16px); }
+  .topbar .search-button, .topbar .icon-button, .topbar .avatar { flex: 0 0 44px; width: 44px; height: 44px; padding: 0; justify-content: center; }
+  .topbar .quick-add { min-width: 0; min-height: 44px; padding: 10px 8px; gap: 6px; font-size: .9rem; }
+}
 .calendar-block.attendance { border-color: #a84767; background: #fdebf0; }
 .calendar-block.attendance-absent { border-color: #b42318; background: #fee9e7; color: #761d18; }
 .calendar-block.attendance-late { border-color: #d39c0b; background: #fff3ca; color: #765514; }
